@@ -428,7 +428,7 @@ config_load(struct config *c, const char *file, int hardfail)
                     config_set_max_line_length(c, tokens[1], hardfail);
                     break;
                 case KEY_MAX_CLIENTS:
-                    config_set_max_line_length(c, tokens[1], hardfail);
+                    config_set_max_clients(c, tokens[1], hardfail);
                     break;
                 case KEY_LOG_LEVEL: {
                     errno = 0;
