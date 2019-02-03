@@ -2,7 +2,6 @@
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
-#include <assert.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
