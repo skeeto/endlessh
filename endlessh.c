@@ -124,6 +124,9 @@ queue_init(struct queue *q)
 static struct client *
 queue_remove(struct queue *q, int fd)
 {
+    /* Yes, this is a linear search, but the element we're looking for
+     * is virtually always one of the first few elements.
+     */
     struct client *c;
     struct client **prev = &q->head;
     for (c = q->head; c; prev = &c->next, c = c->next) {
