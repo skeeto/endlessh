@@ -267,7 +267,7 @@ main(int argc, char **argv)
         /* Wait for next event */
         if (verbose >= 2)
             logmsg("poll(%zu, %d)%s", pollvec->fill, timeout,
-                   nclients == max_clients ? " (no accept)" : "");
+                   nclients >= max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         if (verbose >= 2)
             logmsg("= %d", r);
@@ -291,15 +291,19 @@ main(int argc, char **argv)
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
-                    case ECONNABORTED:
-                    case EINTR:
                     case EMFILE:
                     case ENFILE:
+                        max_clients = nclients;
+                        if (verbose >= 1)
+                            logmsg("max clients reduced to %ld", nclients);
+                        break;
+                    case ECONNABORTED:
+                    case EINTR:
                     case ENOBUFS:
                     case ENOMEM:
                     case EPROTO:
                         fprintf(stderr, "endlessh: warning: %s\n", msg);
-                        continue;
+                        break;
                     default:
                         fprintf(stderr, "endlessh: fatal: %s\n", msg);
                         exit(EXIT_FAILURE);
