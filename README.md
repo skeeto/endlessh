@@ -18,7 +18,7 @@ Usage information is printed with `-h`.
 ```
 Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -d INT    Message millisecond delay [10000]
-  -f        Set config file [/etc/endlessh/config]
+  -f        Set and load config file [/etc/endlessh/config]
   -h        Print this help message and exit
   -l INT    Maximum banner line length (3-255) [32]
   -m INT    Maximum number of clients [4096]

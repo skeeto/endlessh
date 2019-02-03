@@ -401,7 +401,7 @@ usage(FILE *f)
                                "[-m LIMIT] [-p PORT]\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
-    fprintf(f, "  -f        Set config file ["
+    fprintf(f, "  -f        Set and load config file ["
             DEFAULT_CONFIG_FILE "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
     fprintf(f, "  -l INT    Maximum banner line length (3-255) ["
