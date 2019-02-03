@@ -24,6 +24,12 @@ Usage: endlessh [-vh] [-d MSECS] [-m LIMIT] [-p PORT]
   -v        Print diagnostics to standard output (repeatable)
 ```
 
+By default no log messages are produced. The first `-v` enables basic
+logging and a second `-v` enables debug logging (noisy). All log
+messages are sent to standard output.
+
+    endlessh -v >endlessh.log 2>endlessh.err
+
 The purpose of limiting the number of clients (`-m`) is to avoid tying
 up too many system resources with the tarpit. Clients beyond this limit
 are left in the accept queue, not rejected instantly.

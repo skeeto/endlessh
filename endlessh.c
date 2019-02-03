@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 
 #define DEFAULT_MAX_CLIENTS   4096
@@ -30,8 +31,12 @@ uepoch(void)
 }
 
 struct client {
-    long long send_next; // epoch milliseconds for next line
+    char ipaddr[INET6_ADDRSTRLEN];
+    long long connect_time;
+    long long send_next;
+    long long bytes_sent;
     struct client *next;
+    int port;
     int fd;
 };
 
@@ -40,9 +45,30 @@ client_new(int fd, long long send_next)
 {
     struct client *c = malloc(sizeof(*c));
     if (c) {
+        c->connect_time = uepoch();
         c->send_next = send_next;
+        c->bytes_sent = 0;
         c->next = 0;
         c->fd = fd;
+
+        /* Get IP address */
+        struct sockaddr_storage addr;
+        socklen_t len = sizeof(addr);
+        if (getpeername(fd, (struct sockaddr*)&addr, &len) == -1) {
+            c->ipaddr[0] = 0;
+        } else {
+            if (addr.ss_family == AF_INET) {
+                struct sockaddr_in *s = (struct sockaddr_in *)&addr;
+                c->port = ntohs(s->sin_port);
+                inet_ntop(AF_INET, &s->sin_addr,
+                          c->ipaddr, sizeof(c->ipaddr));
+            } else {
+                struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
+                c->port = ntohs(s->sin6_port);
+                inet_ntop(AF_INET6, &s->sin6_addr,
+                          c->ipaddr, sizeof(c->ipaddr));
+            }
+        }
     }
     return c;
 }
@@ -151,16 +177,26 @@ randline(char *line)
     return len;
 }
 
+enum loglevel {
+    LOG_NONE,
+    LOG_INFO,
+    LOG_DEBUG
+};
+
+static enum loglevel loglevel = LOG_NONE;
+
 static void
-logmsg(const char *format, ...)
+logmsg(enum loglevel level, const char *format, ...)
 {
-    long long now = uepoch();
-    fprintf(stderr, "%lld.%03lld: ", now / 1000, now % 1000);
-    va_list ap;
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-    fputc('\n', stderr);
+    if (loglevel >= level) {
+        long long now = uepoch();
+        printf("%lld.%03lld: ", now / 1000, now % 1000);
+        va_list ap;
+        va_start(ap, format);
+        vprintf(format, ap);
+        va_end(ap);
+        fputc('\n', stdout);
+    }
 }
 
 static void
@@ -180,7 +216,6 @@ usage(FILE *f)
 int
 main(int argc, char **argv)
 {
-    int verbose = 0;
     int port = DEFAULT_PORT;
     long delay = DEFAULT_DELAY;
     long max_clients = DEFAULT_MAX_CLIENTS;
@@ -218,7 +253,7 @@ main(int argc, char **argv)
                 port = tmp;
                 break;
             case 'v':
-                verbose++;
+                loglevel++;
                 break;
             default:
                 usage(stderr);
@@ -244,8 +279,7 @@ main(int argc, char **argv)
     check(bind(server, (void *)&addr, sizeof(addr)));
     check(listen(server, INT_MAX));
 
-    if (verbose >= 1)
-        logmsg("listen(port=%d)", port);
+    logmsg(LOG_DEBUG, "listen(port=%d)", port);
 
     srand(time(0));
     for (;;) {
@@ -265,17 +299,14 @@ main(int argc, char **argv)
         }
 
         /* Wait for next event */
-        if (verbose >= 2)
-            logmsg("poll(%zu, %d)%s", pollvec->fill, timeout,
-                   nclients >= max_clients ? " (no accept)" : "");
+        logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
+               nclients >= max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
-        if (verbose >= 2)
-            logmsg("= %d", r);
+        logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
             switch (errno) {
                 case EINTR:
-                    if (verbose >= 1)
-                        logmsg("EINTR");
+                    logmsg(LOG_DEBUG, "EINTR");
                     continue;
                 default:
                     fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
@@ -286,16 +317,16 @@ main(int argc, char **argv)
         /* Check for new incoming connections */
         if (pollvec->fds[0].revents & POLLIN) {
             int fd = accept(server, 0, 0);
-            if (verbose >= 1)
-                logmsg("accept() = %d", fd);
+            logmsg(LOG_DEBUG, "accept() = %d", fd);
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
                     case EMFILE:
                     case ENFILE:
                         max_clients = nclients;
-                        if (verbose >= 1)
-                            logmsg("max clients reduced to %ld", nclients);
+                        logmsg(LOG_INFO,
+                               "maximum number of clients reduced to %ld",
+                               nclients);
                         break;
                     case ECONNABORTED:
                     case EINTR:
@@ -314,8 +345,11 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 }
-                queue_append(queue, client);
                 nclients++;
+                logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%ld/%ld",
+                       client->ipaddr, client->port, client->fd,
+                       nclients, max_clients);
+                queue_append(queue, client);
             }
         }
 
@@ -326,17 +360,25 @@ main(int argc, char **argv)
             struct client *client = queue_remove(queue, fd);
 
             if (revents & POLLHUP) {
-                if (verbose >= 1)
-                    logmsg("close(%d)", fd);
+                logmsg(LOG_DEBUG, "close(%d)", fd);
+                long long dt = uepoch() - client->connect_time;
+                logmsg(LOG_INFO,
+                       "CLOSE host=%s:%d fd=%d "
+                       "time=%lld.%03lld bytes=%lld",
+                       client->ipaddr, client->port, fd,
+                       dt / 1000, dt % 1000,
+                       client->bytes_sent);
                 close(fd);
                 free(client);
                 nclients--;
 
             } else if (revents & POLLOUT) {
-                char line[255];
+                char line[256];
                 int len = randline(line);
                 /* Don't really care if this send fails */
-                send(fd, line, len, MSG_DONTWAIT);
+                ssize_t out = send(fd, line, len, MSG_DONTWAIT);
+                logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
+                client->bytes_sent += out > 0 ? out : out;
                 client->send_next = uepoch() + delay;
                 queue_append(queue, client);
             }
