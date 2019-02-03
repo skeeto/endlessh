@@ -425,7 +425,8 @@ server_create(int port)
     r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &dummy, sizeof(dummy));
     if (r == -1) die();
 
-    struct sockaddr_in addr = {AF_INET, htons(port), {htonl(INADDR_ANY)}};
+    struct sockaddr_in addr = {AF_INET, htons(port)};
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
     r = bind(s, (void *)&addr, sizeof(addr));
     if (r == -1) die();
 
