@@ -36,10 +36,6 @@ messages are sent to standard output.
 
     endlessh -v >endlessh.log 2>endlessh.err
 
-The purpose of limiting the number of clients (`-m`) is to avoid tying
-up too many system resources with the tarpit. Clients beyond this limit
-are left in the accept queue, not rejected instantly.
-
 A SIGTERM signal will gracefully shut down the daemon, allowing it to
 write a complete, consistent log.
 
@@ -50,10 +46,25 @@ A SIGHUP signal requests a reload of the configuration file (`-f`).
 The configuration file has similar syntax to OpenSSH.
 
 ```
-# This is a comment
-Port 22
-Delay 30000
-MaxLineLength 8
-MaxClients 512
-LogLevel 1
+# The port on which to listen for new SSH connections.
+Port 2222
+
+# The endless banner is sent one line at a time. This is the delay
+# in milliseconds between individual lines.
+Delay 10000
+
+# The length of each line is randomized. This controls the maximum
+# length of each line. Shorter lines may keep clients on for longer if
+# they give up after a certain number of bytes.
+MaxLineLength 32
+
+# Maximum number of connections to accept at a time. Connections beyond
+# this are not immediately rejected, but will wait in the queue.
+MaxClients 4096
+
+# Set the detail level for the log.
+#   0 = Quiet
+#   1 = Standard, useful log messages
+#   2 = Very noisy debugging information
+LogLevel 0
 ```
