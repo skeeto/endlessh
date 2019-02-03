@@ -264,8 +264,8 @@ main(int argc, char **argv)
 {
     int port = DEFAULT_PORT;
     int max_length = DEFAULT_LINE_LENGTH;
+    int max_clients = DEFAULT_MAX_CLIENTS;
     long delay = DEFAULT_DELAY;
-    long max_clients = DEFAULT_MAX_CLIENTS;
 
     int option;
     while ((option = getopt(argc, argv, "d:hl:m:p:v")) != -1) {
@@ -294,8 +294,9 @@ main(int argc, char **argv)
                 break;
             case 'm':
                 tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 0) {
-                    fprintf(stderr, "endlessh: Invalid port: %s\n", optarg);
+                if (errno || *end || tmp < 0 || tmp > INT_MAX) {
+                    fprintf(stderr, "endlessh: Invalid max clients: %s\n",
+                            optarg);
                     exit(EXIT_FAILURE);
                 }
                 max_clients = tmp;
@@ -321,7 +322,7 @@ main(int argc, char **argv)
     struct sigaction sa = {.sa_handler = sigterm_handler};
     check(sigaction(SIGTERM, &sa, 0));
 
-    long nclients = 0;
+    int nclients = 0;
 
     struct queue queue[1];
     queue_init(queue);
@@ -385,7 +386,7 @@ main(int argc, char **argv)
                     case ENFILE:
                         max_clients = nclients;
                         logmsg(LOG_INFO,
-                                "maximum number of clients reduced to %ld",
+                                "maximum number of clients reduced to %d",
                                 nclients);
                         break;
                     case ECONNABORTED:
@@ -406,7 +407,7 @@ main(int argc, char **argv)
                     close(fd);
                 }
                 nclients++;
-                logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%ld/%ld",
+                logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
                         nclients, max_clients);
                 queue_append(queue, client);
