@@ -20,7 +20,7 @@
 #define DEFAULT_DELAY            10000  /* milliseconds */
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
-#define DEFAULT_CONFIG_FILE       "/etc/endlessh/config"
+#define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
