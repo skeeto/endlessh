@@ -416,25 +416,37 @@ usage(FILE *f)
 static int
 server_create(int port)
 {
-    int r, s, dummy;
+    int r, s, value;
 
-    s = socket(AF_INET, SOCK_STREAM, 0);
+    s = socket(AF_INET6, SOCK_STREAM, 0);
+    logmsg(LOG_DEBUG, "socket() = %d", s);
     if (s == -1) die();
 
-    dummy = 1;
-    r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &dummy, sizeof(dummy));
-    if (r == -1) die();
+    /* Socket options are best effort, allowed to fail */
 
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(port),
-        .sin_addr.s_addr = htonl(INADDR_ANY)
+    value = 1;
+    r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+    logmsg(LOG_DEBUG, "setsockopt(SO_REUSEADDR, true) = %d", r);
+    if (r == -1)
+        logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+
+    value = 0;
+    r = setsockopt(s, SOL_SOCKET, IPV6_V6ONLY, &value, sizeof(value));
+    logmsg(LOG_DEBUG, "setsockopt(IPV6_V6ONLY, false) = %d", r);
+    if (r == -1)
+        logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+
+    struct sockaddr_in6 addr = {
+        .sin6_family = AF_INET6,
+        .sin6_port = htons(port),
+        .sin6_addr = in6addr_any
     };
     r = bind(s, (void *)&addr, sizeof(addr));
+    logmsg(LOG_DEBUG, "bind(port=%d) = %d", port, r);
     if (r == -1) die();
 
     r = listen(s, INT_MAX);
-    logmsg(LOG_DEBUG, "listen(port=%d) = %d", port, r);
+    logmsg(LOG_DEBUG, "listen() = %d", r);
     if (r == -1) die();
 
     return s;
