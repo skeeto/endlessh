@@ -494,13 +494,14 @@ main(int argc, char **argv)
     /* Log configuration */
     config_log(&config);
 
+    /* Install the signal handlers */
+    signal(SIGPIPE, SIG_IGN);
     {
         struct sigaction sa = {.sa_handler = sigterm_handler};
         int r = sigaction(SIGTERM, &sa, 0);
         if (r == -1)
             die();
     }
-
     {
         struct sigaction sa = {.sa_handler = sighup_handler};
         int r = sigaction(SIGHUP, &sa, 0);
