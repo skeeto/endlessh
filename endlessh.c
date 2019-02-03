@@ -102,7 +102,7 @@ client_destroy(struct client *client)
     logmsg(LOG_DEBUG, "close(%d)", client->fd);
     long long dt = uepoch() - client->connect_time;
     logmsg(LOG_INFO,
-            "CLOSE host=%s:%d fd=%d "
+            "CLOSE host=%s port=%d fd=%d "
             "time=%lld.%03lld bytes=%lld",
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
@@ -606,7 +606,7 @@ main(int argc, char **argv)
                     close(fd);
                 }
                 nclients++;
-                logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%d/%d",
+                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
                         nclients, config.max_clients);
                 queue_append(queue, client);
