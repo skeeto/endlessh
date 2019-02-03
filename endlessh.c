@@ -151,7 +151,7 @@ randline(char *line)
 }
 
 static void
-log(const char *format, ...)
+logmsg(const char *format, ...)
 {
     long long now = uepoch();
     fprintf(stderr, "%lld.%03lld: ", now / 1000, now % 1000);
@@ -244,7 +244,7 @@ main(int argc, char **argv)
     check(listen(server, INT_MAX));
 
     if (verbose >= 1)
-        log("listen(port=%d)", port);
+        logmsg("listen(port=%d)", port);
 
     srand(time(0));
     for (;;) {
@@ -265,16 +265,16 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         if (verbose >= 2)
-            log("poll(%zu, %d)%s", pollvec->fill, timeout,
-                nclients == max_clients ? " (no accept)" : "");
+            logmsg("poll(%zu, %d)%s", pollvec->fill, timeout,
+                   nclients == max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         if (verbose >= 2)
-            log("= %d", r);
+            logmsg("= %d", r);
         if (r == -1) {
             switch (errno) {
                 case EINTR:
                     if (verbose >= 1)
-                        log("EINTR");
+                        logmsg("EINTR");
                     continue;
                 default:
                     fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
@@ -286,7 +286,7 @@ main(int argc, char **argv)
         if (pollvec->fds[0].revents & POLLIN) {
             int fd = accept(server, 0, 0);
             if (verbose >= 1)
-                log("accept() = %d", fd);
+                logmsg("accept() = %d", fd);
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
@@ -322,7 +322,7 @@ main(int argc, char **argv)
 
             if (revents & POLLHUP) {
                 if (verbose >= 1)
-                    log("close(%d)", fd);
+                    logmsg("close(%d)", fd);
                 close(fd);
                 free(client);
                 nclients--;
