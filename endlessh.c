@@ -29,7 +29,11 @@ static long long
 uepoch(void)
 {
     struct timespec tv;
+#ifdef __linux__
+    clock_gettime(CLOCK_REALTIME_COARSE, &tv);
+#else
     clock_gettime(CLOCK_REALTIME, &tv);
+#endif
     return tv.tv_sec * 1000ULL + tv.tv_nsec / 1000000ULL;
 }
 
