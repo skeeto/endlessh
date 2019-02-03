@@ -33,3 +33,6 @@ messages are sent to standard output.
 The purpose of limiting the number of clients (`-m`) is to avoid tying
 up too many system resources with the tarpit. Clients beyond this limit
 are left in the accept queue, not rejected instantly.
+
+A SIGTERM signal will gracefully shut down the daemon, allowing it to
+write a complete, consistent log.

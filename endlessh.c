@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,26 @@ uepoch(void)
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
     return tv.tv_sec * 1000ULL + tv.tv_nsec / 1000000ULL;
+}
+
+static enum loglevel {
+    LOG_NONE,
+    LOG_INFO,
+    LOG_DEBUG
+} loglevel = LOG_NONE;
+
+static void
+logmsg(enum loglevel level, const char *format, ...)
+{
+    if (loglevel >= level) {
+        long long now = uepoch();
+        printf("%lld.%03lld: ", now / 1000, now % 1000);
+        va_list ap;
+        va_start(ap, format);
+        vprintf(format, ap);
+        va_end(ap);
+        fputc('\n', stdout);
+    }
 }
 
 struct client {
@@ -73,6 +94,21 @@ client_new(int fd, long long send_next)
     return c;
 }
 
+static void
+client_destroy(struct client *client)
+{
+    logmsg(LOG_DEBUG, "close(%d)", client->fd);
+    long long dt = uepoch() - client->connect_time;
+    logmsg(LOG_INFO,
+            "CLOSE host=%s:%d fd=%d "
+            "time=%lld.%03lld bytes=%lld",
+            client->ipaddr, client->port, client->fd,
+            dt / 1000, dt % 1000,
+            client->bytes_sent);
+    close(client->fd);
+    free(client);
+}
+
 struct queue {
     struct client *head;
     struct client *tail;
@@ -110,6 +146,18 @@ queue_append(struct queue *q, struct client *c)
         q->tail->next = c;
         q->tail = c;
     }
+}
+
+static void
+queue_destroy(struct queue *q)
+{
+    struct client *c = q->head;
+    while (c) {
+        struct client *dead = c;
+        c = c->next;
+        client_destroy(dead);
+    }
+    q->head = q->tail = 0;
 }
 
 struct pollvec {
@@ -156,6 +204,13 @@ pollvec_push(struct pollvec *v, int fd, short events)
 }
 
 static void
+pollvec_free(struct pollvec *v)
+{
+    free(v->fds);
+    v->fds = 0;
+}
+
+static void
 check(int r)
 {
     if (r == -1) {
@@ -177,26 +232,13 @@ randline(char *line)
     return len;
 }
 
-enum loglevel {
-    LOG_NONE,
-    LOG_INFO,
-    LOG_DEBUG
-};
-
-static enum loglevel loglevel = LOG_NONE;
+static volatile sig_atomic_t running = 1;
 
 static void
-logmsg(enum loglevel level, const char *format, ...)
+sigterm_handler(int signal)
 {
-    if (loglevel >= level) {
-        long long now = uepoch();
-        printf("%lld.%03lld: ", now / 1000, now % 1000);
-        va_list ap;
-        va_start(ap, format);
-        vprintf(format, ap);
-        va_end(ap);
-        fputc('\n', stdout);
-    }
+    (void)signal;
+    running = 0;
 }
 
 static void
@@ -262,6 +304,9 @@ main(int argc, char **argv)
         }
     }
 
+    struct sigaction sa = {.sa_handler = sigterm_handler};
+    check(sigaction(SIGTERM, &sa, 0));
+
     long nclients = 0;
 
     struct queue queue[1];
@@ -283,7 +328,7 @@ main(int argc, char **argv)
     logmsg(LOG_DEBUG, "listen(port=%d)", port);
 
     srand(time(0));
-    for (;;) {
+    while (running) {
         pollvec_clear(pollvec);
         pollvec_push(pollvec, nclients < max_clients ? server : -1, POLLIN);
 
@@ -301,7 +346,7 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-               nclients >= max_clients ? " (no accept)" : "");
+                nclients >= max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
@@ -326,8 +371,8 @@ main(int argc, char **argv)
                     case ENFILE:
                         max_clients = nclients;
                         logmsg(LOG_INFO,
-                               "maximum number of clients reduced to %ld",
-                               nclients);
+                                "maximum number of clients reduced to %ld",
+                                nclients);
                         break;
                     case ECONNABORTED:
                     case EINTR:
@@ -348,8 +393,8 @@ main(int argc, char **argv)
                 }
                 nclients++;
                 logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%ld/%ld",
-                       client->ipaddr, client->port, client->fd,
-                       nclients, max_clients);
+                        client->ipaddr, client->port, client->fd,
+                        nclients, max_clients);
                 queue_append(queue, client);
             }
         }
@@ -361,28 +406,26 @@ main(int argc, char **argv)
             struct client *client = queue_remove(queue, fd);
 
             if (revents & POLLHUP) {
-                logmsg(LOG_DEBUG, "close(%d)", fd);
-                long long dt = uepoch() - client->connect_time;
-                logmsg(LOG_INFO,
-                       "CLOSE host=%s:%d fd=%d "
-                       "time=%lld.%03lld bytes=%lld",
-                       client->ipaddr, client->port, fd,
-                       dt / 1000, dt % 1000,
-                       client->bytes_sent);
-                close(fd);
-                free(client);
+                client_destroy(client);
                 nclients--;
 
             } else if (revents & POLLOUT) {
                 char line[256];
                 int len = randline(line);
-                /* Don't really care if this send fails */
+                /* Don't really care if send is short */
                 ssize_t out = send(fd, line, len, MSG_DONTWAIT);
-                logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
-                client->bytes_sent += out > 0 ? out : out;
-                client->send_next = uepoch() + delay;
-                queue_append(queue, client);
+                if (out < 0)
+                    client_destroy(client);
+                else {
+                    logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
+                    client->bytes_sent += out;
+                    client->send_next = uepoch() + delay;
+                    queue_append(queue, client);
+                }
             }
         }
     }
+
+    pollvec_free(pollvec);
+    queue_destroy(queue);
 }
