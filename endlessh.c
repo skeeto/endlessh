@@ -124,12 +124,14 @@ client_destroy(struct client *client)
 struct queue {
     struct client *head;
     struct client *tail;
+    int length;
 };
 
 static void
 queue_init(struct queue *q)
 {
     q->head = q->tail = 0;
+    q->length = 0;
 }
 
 static struct client *
@@ -142,6 +144,7 @@ queue_remove(struct queue *q, int fd)
     struct client **prev = &q->head;
     for (c = q->head; c; prev = &c->next, c = c->next) {
         if (c->fd == fd) {
+            q->length--;
             if (q->tail == c)
                 q->tail = 0;
             *prev = c->next;
@@ -161,6 +164,7 @@ queue_append(struct queue *q, struct client *c)
         q->tail->next = c;
         q->tail = c;
     }
+    q->length++;
 }
 
 static void
@@ -173,6 +177,7 @@ queue_destroy(struct queue *q)
         client_destroy(dead);
     }
     q->head = q->tail = 0;
+    q->length = 0;
 }
 
 struct pollvec {
@@ -473,7 +478,6 @@ server_create(int port)
     if (s == -1) die();
 
     /* Socket options are best effort, allowed to fail */
-
     value = 1;
     r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
     logmsg(LOG_DEBUG, "setsockopt(SO_REUSEADDR, true) = %d", r);
@@ -559,17 +563,15 @@ main(int argc, char **argv)
             die();
     }
 
-    int nclients = 0;
-
     struct queue queue[1];
     queue_init(queue);
 
     struct pollvec pollvec[1];
     pollvec_init(pollvec);
 
-    int server = server_create(config.port);
-
     unsigned long rng = uepoch();
+
+    int server = server_create(config.port);
 
     while (running) {
         if (reload) {
@@ -586,7 +588,7 @@ main(int argc, char **argv)
 
         /* Enqueue the listening socket first */
         pollvec_clear(pollvec);
-        if (nclients < config.max_clients)
+        if (queue->length < config.max_clients)
             pollvec_push(pollvec, server, POLLIN);
         else
             pollvec_push(pollvec, -1, POLLIN);
@@ -605,7 +607,7 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-                nclients >= config.max_clients ? " (no accept)" : "");
+                queue->length >= config.max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
@@ -628,10 +630,10 @@ main(int argc, char **argv)
                 switch (errno) {
                     case EMFILE:
                     case ENFILE:
-                        config.max_clients = nclients;
+                        config.max_clients = queue->length;
                         logmsg(LOG_INFO,
                                 "MaxClients %d",
-                                nclients);
+                                queue->length);
                         break;
                     case ECONNABORTED:
                     case EINTR:
@@ -651,10 +653,9 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 }
-                nclients++;
                 logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
-                        nclients, config.max_clients);
+                        queue->length, config.max_clients);
                 queue_append(queue, client);
             }
         }
@@ -667,20 +668,24 @@ main(int argc, char **argv)
 
             if (revents & POLLHUP) {
                 client_destroy(client);
-                nclients--;
 
             } else if (revents & POLLOUT) {
                 char line[256];
                 int len = randline(line, config.max_line_length, &rng);
-                /* Don't really care if send is short */
-                ssize_t out = send(fd, line, len, MSG_DONTWAIT);
-                if (out < 0)
-                    client_destroy(client);
-                else {
-                    logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
-                    client->bytes_sent += out;
-                    client->send_next = uepoch() + config.delay;
-                    queue_append(queue, client);
+                for (;;) {
+                    /* Don't really care if send is short */
+                    ssize_t out = send(fd, line, len, MSG_DONTWAIT);
+                    if (out == -1 && errno == EINTR) {
+                        continue;  /* try again */
+                    } else if (out == -1) {
+                        client_destroy(client);
+                    } else {
+                        logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
+                        client->bytes_sent += out;
+                        client->send_next = uepoch() + config.delay;
+                        queue_append(queue, client);
+                        break;
+                    }
                 }
             }
         }
