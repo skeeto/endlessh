@@ -492,6 +492,11 @@ main(int argc, char **argv)
         }
     }
 
+    if (argv[optind]) {
+        fprintf(stderr, "endlessh: too many arguments\n");
+        exit(EXIT_FAILURE);
+    }
+
     /* Log configuration */
     config_log(&config);
 
