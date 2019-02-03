@@ -16,8 +16,9 @@ trap multiple clients at a time.
 Usage information is printed with `-h`.
 
 ```
-Usage: endlessh [-vh] [-d MSECS] [-l LEN] [-m LIMIT] [-p PORT]
+Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -d INT    Message millisecond delay [10000]
+  -f        Set config file [/etc/endlessh/config]
   -h        Print this help message and exit
   -l INT    Maximum banner line length (3-255) [32]
   -m INT    Maximum number of clients [4096]
@@ -37,3 +38,5 @@ are left in the accept queue, not rejected instantly.
 
 A SIGTERM signal will gracefully shut down the daemon, allowing it to
 write a complete, consistent log.
+
+A SIGHUP signal requests a reload of the configuration file (`-f`).

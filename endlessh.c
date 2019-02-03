@@ -20,6 +20,7 @@
 #define DEFAULT_DELAY            10000  /* milliseconds */
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
+#define DEFAULT_CONFIG_FILE       "/etc/endlessh/config"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
@@ -245,6 +246,15 @@ sigterm_handler(int signal)
     running = 0;
 }
 
+static volatile sig_atomic_t reload = 0;
+
+static void
+sighup_handler(int signal)
+{
+    (void)signal;
+    reload = 1;
+}
+
 struct config {
     int port;
     int delay;
@@ -320,12 +330,81 @@ config_set_max_line_length(struct config *c, const char *s, int hardfail)
 }
 
 static void
+config_fail(const char *file, long lineno, int hardfail)
+{
+    fprintf(stderr, "%s:%ld: Expected integer\n", file, lineno);
+    if (hardfail) exit(EXIT_FAILURE);
+}
+
+static void
+config_load(struct config *c, const char *file, int hardfail)
+{
+    long lineno = 0;
+    FILE *f = fopen(file, "r");
+    if (f) {
+        const char *delim = " \n";
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            lineno++;
+            char *save = 0;
+            char *tok = strtok_r(line, delim, &save);
+            if (!tok) {
+                continue;
+            } else if (!strcmp(tok, "Port")) {
+                tok = strtok_r(0, delim, &save);
+                if (tok) {
+                    config_set_port(c, tok, hardfail);
+                } else {
+                    config_fail(file, lineno, hardfail);
+                }
+            } else if (!strcmp(tok, "Delay")) {
+                tok = strtok_r(0, delim, &save);
+                if (tok) {
+                    config_set_delay(c, tok, hardfail);
+                } else {
+                    config_fail(file, lineno, hardfail);
+                }
+            } else if (!strcmp(tok, "MaxLineLength")) {
+                tok = strtok_r(0, delim, &save);
+                if (tok) {
+                    config_set_max_line_length(c, tok, hardfail);
+                } else {
+                    config_fail(file, lineno, hardfail);
+                }
+            } else if (!strcmp(tok, "MaxClients")) {
+                tok = strtok_r(0, delim, &save);
+                if (tok) {
+                    config_set_max_line_length(c, tok, hardfail);
+                } else {
+                    config_fail(file, lineno, hardfail);
+                }
+            } else {
+                fprintf(stderr, "%s:%ld: Unknown option '%s'\n",
+                        file, lineno, tok);
+            }
+        }
+        fclose(f);
+    }
+}
+
+static void
+config_log(const struct config *c)
+{
+    logmsg(LOG_INFO, "Port %d", c->port);
+    logmsg(LOG_INFO, "Delay %ld", c->delay);
+    logmsg(LOG_INFO, "MaxLineLength %d", c->max_line_length);
+    logmsg(LOG_INFO, "MaxClients %d", c->max_clients);
+}
+
+static void
 usage(FILE *f)
 {
-    fprintf(f, "Usage: endlessh [-vh] [-d MSECS] [-l LEN] "
+    fprintf(f, "Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] "
                                "[-m LIMIT] [-p PORT]\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
+    fprintf(f, "  -f        Set config file ["
+            DEFAULT_CONFIG_FILE "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
     fprintf(f, "  -l INT    Maximum banner line length (3-255) ["
             XSTR(DEFAULT_MAX_LINE_LENGTH) "]\n");
@@ -340,12 +419,18 @@ int
 main(int argc, char **argv)
 {
     struct config config = CONFIG_DEFAULT;
+    const char *config_file = DEFAULT_CONFIG_FILE;
+    config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "d:hl:m:p:v")) != -1) {
+    while ((option = getopt(argc, argv, "d:f:hl:m:p:v")) != -1) {
         switch (option) {
             case 'd':
                 config_set_delay(&config, optarg, 1);
+                break;
+            case 'f':
+                config_file = optarg;
+                config_load(&config, optarg, 1);
                 break;
             case 'h':
                 usage(stdout);
@@ -371,13 +456,17 @@ main(int argc, char **argv)
     }
 
     /* Log configuration */
-    logmsg(LOG_INFO, "Port %d", config.port);
-    logmsg(LOG_INFO, "Delay %ld", config.delay);
-    logmsg(LOG_INFO, "MaxLineLength %d", config.max_line_length);
-    logmsg(LOG_INFO, "MaxClients %d", config.max_clients);
+    config_log(&config);
 
-    struct sigaction sa = {.sa_handler = sigterm_handler};
-    check(sigaction(SIGTERM, &sa, 0));
+    {
+        struct sigaction sa = {.sa_handler = sigterm_handler};
+        check(sigaction(SIGTERM, &sa, 0));
+    }
+
+    {
+        struct sigaction sa = {.sa_handler = sighup_handler};
+        check(sigaction(SIGHUP, &sa, 0));
+    }
 
     int nclients = 0;
 
@@ -405,13 +494,21 @@ main(int argc, char **argv)
 
     srand(time(0));
     while (running) {
+        if (reload) {
+            /* Configuration reload requested (SIGHUP) */
+            config_load(&config, config_file, 0);
+            config_log(&config);
+            reload = 0;
+        }
+
+        /* Enqueue the listening socket first */
         pollvec_clear(pollvec);
         if (nclients < config.max_clients)
             pollvec_push(pollvec, server, POLLIN);
         else
             pollvec_push(pollvec, -1, POLLIN);
 
-        /* Poll clients that are due for another message */
+        /* Enqueue clients that are due for another message */
         int timeout = -1;
         long long now = uepoch();
         for (struct client *c = queue->head; c; c = c->next) {
