@@ -273,6 +273,7 @@ main(int argc, char **argv)
         char *end;
         switch (option) {
             case 'd':
+                errno = 0;
                 delay = strtol(optarg, &end, 10);
                 if (errno || *end || delay < 0) {
                     fprintf(stderr, "endlessh: Invalid delay: %s\n", optarg);
@@ -284,6 +285,7 @@ main(int argc, char **argv)
                 exit(EXIT_SUCCESS);
                 break;
             case 'l':
+                errno = 0;
                 tmp = strtol(optarg, &end, 10);
                 if (errno || *end || tmp < 3 || tmp > 255) {
                     fprintf(stderr, "endlessh: Invalid line length: %s\n",
@@ -293,8 +295,9 @@ main(int argc, char **argv)
                 max_length = tmp;
                 break;
             case 'm':
+                errno = 0;
                 tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 0 || tmp > INT_MAX) {
+                if (errno || *end || tmp < 1 || tmp > INT_MAX) {
                     fprintf(stderr, "endlessh: Invalid max clients: %s\n",
                             optarg);
                     exit(EXIT_FAILURE);
@@ -302,8 +305,9 @@ main(int argc, char **argv)
                 max_clients = tmp;
                 break;
             case 'p':
+                errno = 0;
                 tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 0 || tmp > 65535) {
+                if (errno || *end || tmp < 1 || tmp > 65535) {
                     fprintf(stderr, "endlessh: Invalid port: %s\n", optarg);
                     exit(EXIT_FAILURE);
                 }
