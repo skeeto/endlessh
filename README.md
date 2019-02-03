@@ -50,6 +50,7 @@ A SIGHUP signal requests a reload of the configuration file (`-f`).
 The configuration file has similar syntax to OpenSSH.
 
 ```
+# This is a comment
 Port 22
 Delay 30000
 MaxLineLength 8

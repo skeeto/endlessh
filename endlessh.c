@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE  200112L
+#define _POSIX_C_SOURCE 200809L
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
@@ -338,11 +338,27 @@ config_set_max_line_length(struct config *c, const char *s, int hardfail)
     }
 }
 
-static void
-config_fail(const char *file, long lineno, int hardfail)
+enum config_key {
+    KEY_INVALID,
+    KEY_PORT,
+    KEY_DELAY,
+    KEY_MAX_LINE_LENGTH,
+    KEY_MAX_CLIENTS,
+};
+
+static enum config_key
+config_key_parse(const char *tok)
 {
-    fprintf(stderr, "%s:%ld: Expected integer\n", file, lineno);
-    if (hardfail) exit(EXIT_FAILURE);
+    static const char *const table[] = {
+        [KEY_PORT]            = "Port",
+        [KEY_DELAY]           = "Delay",
+        [KEY_MAX_LINE_LENGTH] = "MaxLineLength",
+        [KEY_MAX_CLIENTS]     = "MaxClients",
+    };
+    for (size_t i = 1; i < sizeof(table) / sizeof(*table); i++)
+        if (!strcmp(tok, table[i]))
+            return i;
+    return KEY_INVALID;
 }
 
 static void
@@ -351,47 +367,64 @@ config_load(struct config *c, const char *file, int hardfail)
     long lineno = 0;
     FILE *f = fopen(file, "r");
     if (f) {
-        const char *delim = " \n";
-        char line[256];
-        while (fgets(line, sizeof(line), f)) {
+        size_t len = 0;
+        char *line = 0;
+        while (getline(&line, &len, f) != -1) {
             lineno++;
+
+            /* Remove comments */
+            char *comment = strchr(line, '#');
+            if (comment)
+                *comment = 0;
+
+            /* Parse tokes on line */
             char *save = 0;
-            char *tok = strtok_r(line, delim, &save);
-            if (!tok) {
-                continue;
-            } else if (!strcmp(tok, "Port")) {
-                tok = strtok_r(0, delim, &save);
-                if (tok) {
-                    config_set_port(c, tok, hardfail);
-                } else {
-                    config_fail(file, lineno, hardfail);
-                }
-            } else if (!strcmp(tok, "Delay")) {
-                tok = strtok_r(0, delim, &save);
-                if (tok) {
-                    config_set_delay(c, tok, hardfail);
-                } else {
-                    config_fail(file, lineno, hardfail);
-                }
-            } else if (!strcmp(tok, "MaxLineLength")) {
-                tok = strtok_r(0, delim, &save);
-                if (tok) {
-                    config_set_max_line_length(c, tok, hardfail);
-                } else {
-                    config_fail(file, lineno, hardfail);
-                }
-            } else if (!strcmp(tok, "MaxClients")) {
-                tok = strtok_r(0, delim, &save);
-                if (tok) {
-                    config_set_max_line_length(c, tok, hardfail);
-                } else {
-                    config_fail(file, lineno, hardfail);
-                }
-            } else {
-                fprintf(stderr, "%s:%ld: Unknown option '%s'\n",
-                        file, lineno, tok);
+            char *tokens[3];
+            int ntokens = 0;
+            for (; ntokens < 3; ntokens++) {
+                char *tok = strtok_r(ntokens ? 0 : line, " \r\n", &save);
+                if (!tok)
+                    break;
+                tokens[ntokens] = tok;
+            }
+
+            switch (ntokens) {
+                case 0: /* Empty line */
+                    continue;
+                case 1:
+                    fprintf(stderr, "%s:%ld: Missing value\n", file, lineno);
+                    if (hardfail) exit(EXIT_FAILURE);
+                    continue;
+                case 2: /* Expected */
+                    break;
+                case 3:
+                    fprintf(stderr, "%s:%ld: Too many values\n", file, lineno);
+                    if (hardfail) exit(EXIT_FAILURE);
+                    continue;
+            }
+
+            enum config_key key = config_key_parse(tokens[0]);
+            switch (key) {
+                case KEY_INVALID:
+                    fprintf(stderr, "%s:%ld: Unknown option '%s'\n",
+                            file, lineno, tokens[0]);
+                    break;
+                case KEY_PORT:
+                    config_set_port(c, tokens[1], hardfail);
+                    break;
+                case KEY_DELAY:
+                    config_set_delay(c, tokens[1], hardfail);
+                    break;
+                case KEY_MAX_LINE_LENGTH:
+                    config_set_max_line_length(c, tokens[1], hardfail);
+                    break;
+                case KEY_MAX_CLIENTS:
+                    config_set_max_line_length(c, tokens[1], hardfail);
+                    break;
             }
         }
+
+        free(line);
         fclose(f);
     }
 }
