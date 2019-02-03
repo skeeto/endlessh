@@ -11,7 +11,7 @@ occurs, this program doesn't depend on any cryptographic libraries. It's
 a simple, single-threaded, standalone C program. It uses `poll()` to
 trap multiple clients at a time.
 
-### Usage
+## Usage
 
 Usage information is printed with `-h`.
 
@@ -40,3 +40,14 @@ A SIGTERM signal will gracefully shut down the daemon, allowing it to
 write a complete, consistent log.
 
 A SIGHUP signal requests a reload of the configuration file (`-f`).
+
+## Sample Configuration File
+
+The configuration file has similar syntax to OpenSSH.
+
+```
+Port 22
+Delay 30000
+MaxLineLength 8
+MaxClients 512
+```
