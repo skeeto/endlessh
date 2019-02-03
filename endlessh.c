@@ -233,12 +233,19 @@ die(void)
     exit(EXIT_FAILURE);
 }
 
-static int
-randline(char *line, int maxlen)
+static unsigned
+rand16(unsigned long s[1])
 {
-    int len = 3 + rand() % (maxlen - 2);
+    s[0] = s[0] * 1103515245UL + 12345UL;
+    return s[0] >> 16;
+}
+
+static int
+randline(char *line, int maxlen, unsigned long s[1])
+{
+    int len = 3 + rand16(s) % (maxlen - 2);
     for (int i = 0; i < len - 2; i++)
-        line[i] = 32 + rand() % 95;
+        line[i] = 32 + rand16(s) % 95;
     line[len - 2] = 13;
     line[len - 1] = 10;
     if (memcmp(line, "SSH-", 4) == 0)
@@ -563,7 +570,8 @@ main(int argc, char **argv)
 
     int server = server_create(config.port);
 
-    srand(time(0));
+    unsigned long rng = uepoch();
+
     while (running) {
         if (reload) {
             /* Configuration reload requested (SIGHUP) */
@@ -664,7 +672,7 @@ main(int argc, char **argv)
 
             } else if (revents & POLLOUT) {
                 char line[256];
-                int len = randline(line, config.max_line_length);
+                int len = randline(line, config.max_line_length, &rng);
                 /* Don't really care if send is short */
                 ssize_t out = send(fd, line, len, MSG_DONTWAIT);
                 if (out < 0)
