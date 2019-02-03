@@ -16,10 +16,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#define DEFAULT_MAX_CLIENTS   4096
-#define DEFAULT_LINE_LENGTH     32
-#define DEFAULT_PORT          2222
-#define DEFAULT_DELAY        10000  // milliseconds
+#define DEFAULT_PORT              2222
+#define DEFAULT_DELAY            10000  /* milliseconds */
+#define DEFAULT_MAX_LINE_LENGTH     32
+#define DEFAULT_MAX_CLIENTS       4096
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
@@ -245,6 +245,80 @@ sigterm_handler(int signal)
     running = 0;
 }
 
+struct config {
+    int port;
+    int delay;
+    int max_line_length;
+    int max_clients;
+};
+
+#define CONFIG_DEFAULT { \
+    .port            = DEFAULT_PORT, \
+    .delay           = DEFAULT_DELAY, \
+    .max_line_length = DEFAULT_MAX_LINE_LENGTH, \
+    .max_clients     = DEFAULT_MAX_CLIENTS, \
+}
+
+static void
+config_set_port(struct config *c, const char *s, int hardfail)
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 1 || tmp > 65535) {
+        fprintf(stderr, "endlessh: Invalid port: %s\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->port = tmp;
+    }
+}
+
+static void
+config_set_delay(struct config *c, const char *s, int hardfail)
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 1 || tmp > INT_MAX) {
+        fprintf(stderr, "endlessh: Invalid delay: %s\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->delay = tmp;
+    }
+}
+
+static void
+config_set_max_clients(struct config *c, const char *s, int hardfail)
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 1 || tmp > INT_MAX) {
+        fprintf(stderr, "endlessh: Invalid max clients: %s\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->max_clients = tmp;
+    }
+}
+
+static void
+config_set_max_line_length(struct config *c, const char *s, int hardfail)
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 3 || tmp > 255) {
+        fprintf(stderr, "endlessh: Invalid line length: %s\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->max_line_length = tmp;
+    }
+}
+
 static void
 usage(FILE *f)
 {
@@ -254,7 +328,7 @@ usage(FILE *f)
             XSTR(DEFAULT_DELAY) "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
     fprintf(f, "  -l INT    Maximum banner line length (3-255) ["
-            XSTR(DEFAULT_LINE_LENGTH) "]\n");
+            XSTR(DEFAULT_MAX_LINE_LENGTH) "]\n");
     fprintf(f, "  -m INT    Maximum number of clients ["
             XSTR(DEFAULT_MAX_CLIENTS) "]\n");
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
@@ -265,56 +339,26 @@ usage(FILE *f)
 int
 main(int argc, char **argv)
 {
-    int port = DEFAULT_PORT;
-    int max_length = DEFAULT_LINE_LENGTH;
-    int max_clients = DEFAULT_MAX_CLIENTS;
-    long delay = DEFAULT_DELAY;
+    struct config config = CONFIG_DEFAULT;
 
     int option;
     while ((option = getopt(argc, argv, "d:hl:m:p:v")) != -1) {
-        long tmp;
-        char *end;
         switch (option) {
             case 'd':
-                errno = 0;
-                delay = strtol(optarg, &end, 10);
-                if (errno || *end || delay < 0) {
-                    fprintf(stderr, "endlessh: Invalid delay: %s\n", optarg);
-                    exit(EXIT_FAILURE);
-                }
+                config_set_delay(&config, optarg, 1);
                 break;
             case 'h':
                 usage(stdout);
                 exit(EXIT_SUCCESS);
                 break;
             case 'l':
-                errno = 0;
-                tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 3 || tmp > 255) {
-                    fprintf(stderr, "endlessh: Invalid line length: %s\n",
-                            optarg);
-                    exit(EXIT_FAILURE);
-                }
-                max_length = tmp;
+                config_set_max_line_length(&config, optarg, 1);
                 break;
             case 'm':
-                errno = 0;
-                tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 1 || tmp > INT_MAX) {
-                    fprintf(stderr, "endlessh: Invalid max clients: %s\n",
-                            optarg);
-                    exit(EXIT_FAILURE);
-                }
-                max_clients = tmp;
+                config_set_max_clients(&config, optarg, 1);
                 break;
             case 'p':
-                errno = 0;
-                tmp = strtol(optarg, &end, 10);
-                if (errno || *end || tmp < 1 || tmp > 65535) {
-                    fprintf(stderr, "endlessh: Invalid port: %s\n", optarg);
-                    exit(EXIT_FAILURE);
-                }
-                port = tmp;
+                config_set_port(&config, optarg, 1);
                 break;
             case 'v':
                 if (!loglevel++)
@@ -325,6 +369,12 @@ main(int argc, char **argv)
                 exit(EXIT_FAILURE);
         }
     }
+
+    /* Log configuration */
+    logmsg(LOG_INFO, "Port %d", config.port);
+    logmsg(LOG_INFO, "Delay %ld", config.delay);
+    logmsg(LOG_INFO, "MaxLineLength %d", config.max_line_length);
+    logmsg(LOG_INFO, "MaxClients %d", config.max_clients);
 
     struct sigaction sa = {.sa_handler = sigterm_handler};
     check(sigaction(SIGTERM, &sa, 0));
@@ -343,16 +393,23 @@ main(int argc, char **argv)
     int dummy = 1;
     check(setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &dummy, sizeof(dummy)));
 
-    struct sockaddr_in addr = {AF_INET, htons(port), {htonl(INADDR_ANY)}};
+    struct sockaddr_in addr = {
+        AF_INET,
+        htons(config.port),
+        {htonl(INADDR_ANY)}
+    };
     check(bind(server, (void *)&addr, sizeof(addr)));
     check(listen(server, INT_MAX));
 
-    logmsg(LOG_DEBUG, "listen(port=%d)", port);
+    logmsg(LOG_DEBUG, "listen(port=%d)", config.port);
 
     srand(time(0));
     while (running) {
         pollvec_clear(pollvec);
-        pollvec_push(pollvec, nclients < max_clients ? server : -1, POLLIN);
+        if (nclients < config.max_clients)
+            pollvec_push(pollvec, server, POLLIN);
+        else
+            pollvec_push(pollvec, -1, POLLIN);
 
         /* Poll clients that are due for another message */
         int timeout = -1;
@@ -368,7 +425,7 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-                nclients >= max_clients ? " (no accept)" : "");
+                nclients >= config.max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
@@ -391,9 +448,9 @@ main(int argc, char **argv)
                 switch (errno) {
                     case EMFILE:
                     case ENFILE:
-                        max_clients = nclients;
+                        config.max_clients = nclients;
                         logmsg(LOG_INFO,
-                                "maximum number of clients reduced to %d",
+                                "MaxClients %d",
                                 nclients);
                         break;
                     case ECONNABORTED:
@@ -408,7 +465,8 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
             } else {
-                struct client *client = client_new(fd, uepoch() + delay / 2);
+                long long send_next = uepoch() + config.delay / 2;
+                struct client *client = client_new(fd, send_next);
                 if (!client) {
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
@@ -416,7 +474,7 @@ main(int argc, char **argv)
                 nclients++;
                 logmsg(LOG_INFO, "ACCEPT host=%s:%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
-                        nclients, max_clients);
+                        nclients, config.max_clients);
                 queue_append(queue, client);
             }
         }
@@ -433,7 +491,7 @@ main(int argc, char **argv)
 
             } else if (revents & POLLOUT) {
                 char line[256];
-                int len = randline(line, max_length);
+                int len = randline(line, config.max_line_length);
                 /* Don't really care if send is short */
                 ssize_t out = send(fd, line, len, MSG_DONTWAIT);
                 if (out < 0)
@@ -441,7 +499,7 @@ main(int argc, char **argv)
                 else {
                     logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
                     client->bytes_sent += out;
-                    client->send_next = uepoch() + delay;
+                    client->send_next = uepoch() + config.delay;
                     queue_append(queue, client);
                 }
             }
