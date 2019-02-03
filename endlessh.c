@@ -430,11 +430,13 @@ server_create(int port)
     if (r == -1)
         logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
 
+    #if defined(IPV6_V6ONLY)
     value = 0;
     r = setsockopt(s, SOL_SOCKET, IPV6_V6ONLY, &value, sizeof(value));
     logmsg(LOG_DEBUG, "setsockopt(IPV6_V6ONLY, false) = %d", r);
     if (r == -1)
         logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+    #endif /* IPV6_V6ONLY */
 
     struct sockaddr_in6 addr = {
         .sin6_family = AF_INET6,
