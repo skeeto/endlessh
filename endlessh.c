@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 
 #define DEFAULT_MAX_CLIENTS   4096
+#define DEFAULT_LINE_LENGTH     32
 #define DEFAULT_PORT          2222
 #define DEFAULT_DELAY        10000  // milliseconds
 
@@ -220,9 +221,9 @@ check(int r)
 }
 
 static int
-randline(char *line)
+randline(char *line, int maxlen)
 {
-    int len = 3 + rand() % 61;
+    int len = 3 + rand() % (maxlen - 2);
     for (int i = 0; i < len - 2; i++)
         line[i] = 32 + rand() % 95;
     line[len - 2] = 13;
@@ -244,10 +245,13 @@ sigterm_handler(int signal)
 static void
 usage(FILE *f)
 {
-    fprintf(f, "Usage: endlessh [-vh] [-d MSECS] [-m LIMIT] [-p PORT]\n");
+    fprintf(f, "Usage: endlessh [-vh] [-d MSECS] [-l LEN] "
+                               "[-m LIMIT] [-p PORT]\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
+    fprintf(f, "  -l INT    Maximum banner line length (3-255) ["
+            XSTR(DEFAULT_LINE_LENGTH) "]\n");
     fprintf(f, "  -m INT    Maximum number of clients ["
             XSTR(DEFAULT_MAX_CLIENTS) "]\n");
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
@@ -259,11 +263,12 @@ int
 main(int argc, char **argv)
 {
     int port = DEFAULT_PORT;
+    int max_length = DEFAULT_LINE_LENGTH;
     long delay = DEFAULT_DELAY;
     long max_clients = DEFAULT_MAX_CLIENTS;
 
     int option;
-    while ((option = getopt(argc, argv, "d:hm:p:v")) != -1) {
+    while ((option = getopt(argc, argv, "d:hl:m:p:v")) != -1) {
         long tmp;
         char *end;
         switch (option) {
@@ -277,6 +282,15 @@ main(int argc, char **argv)
             case 'h':
                 usage(stdout);
                 exit(EXIT_SUCCESS);
+                break;
+            case 'l':
+                tmp = strtol(optarg, &end, 10);
+                if (errno || *end || tmp < 3 || tmp > 255) {
+                    fprintf(stderr, "endlessh: Invalid line length: %s\n",
+                            optarg);
+                    exit(EXIT_FAILURE);
+                }
+                max_length = tmp;
                 break;
             case 'm':
                 tmp = strtol(optarg, &end, 10);
@@ -411,7 +425,7 @@ main(int argc, char **argv)
 
             } else if (revents & POLLOUT) {
                 char line[256];
-                int len = randline(line);
+                int len = randline(line, max_length);
                 /* Don't really care if send is short */
                 ssize_t out = send(fd, line, len, MSG_DONTWAIT);
                 if (out < 0)

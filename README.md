@@ -16,9 +16,10 @@ trap multiple clients at a time.
 Usage information is printed with `-h`.
 
 ```
-Usage: endlessh [-vh] [-d MSECS] [-m LIMIT] [-p PORT]
+Usage: endlessh [-vh] [-d MSECS] [-l LEN] [-m LIMIT] [-p PORT]
   -d INT    Message millisecond delay [10000]
   -h        Print this help message and exit
+  -l INT    Maximum banner line length (3-255) [32]
   -m INT    Maximum number of clients [4096]
   -p INT    Listening port [2222]
   -v        Print diagnostics to standard output (repeatable)
