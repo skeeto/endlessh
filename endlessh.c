@@ -47,8 +47,15 @@ static void
 logmsg(enum loglevel level, const char *format, ...)
 {
     if (loglevel >= level) {
+        /* Print a timestamp */
         long long now = uepoch();
-        printf("%lld.%03lld: ", now / 1000, now % 1000);
+        time_t t = now / 1000;
+        char date[64];
+        struct tm tm[1];
+        strftime(date, sizeof(date), "%Y-%m-%dT%H:%M:%S", gmtime_r(&t, tm));
+        printf("%s.%03lldZ ", date, now % 1000);
+
+        /* Print the rest of the log message */
         va_list ap;
         va_start(ap, format);
         vprintf(format, ap);
