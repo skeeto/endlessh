@@ -97,7 +97,7 @@ pollvec_init(struct pollvec *v)
 {
     v->cap = 4;
     v->fill = 0;
-    v->fds = malloc(v->cap * sizeof(*v->fds));
+    v->fds = malloc(v->cap * sizeof(v->fds[0]));
     if (!v->fds) {
         fprintf(stderr, "endlessh: pollvec initialization failed\n");
         exit(EXIT_FAILURE);
@@ -114,13 +114,14 @@ static int
 pollvec_push(struct pollvec *v, int fd, short events)
 {
     if (v->cap == v->fill) {
-        size_t size = v->cap * 2 * sizeof(*v->fds);
-        if (size < v->cap * sizeof(*v->fds))
+        size_t size = v->cap * 2 * sizeof(v->fds[0]);
+        if (size < v->cap * sizeof(v->fds[0]))
             return 0; // overflow
         struct pollfd *grow = realloc(v->fds, size);
         if (!grow)
             return 0;
         v->fds = grow;
+        v->cap *= 2;
     }
     v->fds[v->fill].fd = fd;
     v->fds[v->fill].events = events;
