@@ -216,12 +216,10 @@ pollvec_free(struct pollvec *v)
 }
 
 static void
-check(int r)
+die(void)
 {
-    if (r == -1) {
-        fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+    fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
 }
 
 static int
@@ -415,6 +413,29 @@ usage(FILE *f)
             "(repeatable)\n");
 }
 
+static int
+server_create(int port)
+{
+    int r, s, dummy;
+
+    s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == -1) die();
+
+    dummy = 1;
+    r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &dummy, sizeof(dummy));
+    if (r == -1) die();
+
+    struct sockaddr_in addr = {AF_INET, htons(port), {htonl(INADDR_ANY)}};
+    r = bind(s, (void *)&addr, sizeof(addr));
+    if (r == -1) die();
+
+    r = listen(s, INT_MAX);
+    logmsg(LOG_DEBUG, "listen(port=%d) = %d", port, r);
+    if (r == -1) die();
+
+    return s;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -460,12 +481,16 @@ main(int argc, char **argv)
 
     {
         struct sigaction sa = {.sa_handler = sigterm_handler};
-        check(sigaction(SIGTERM, &sa, 0));
+        int r = sigaction(SIGTERM, &sa, 0);
+        if (r == -1)
+            die();
     }
 
     {
         struct sigaction sa = {.sa_handler = sighup_handler};
-        check(sigaction(SIGHUP, &sa, 0));
+        int r = sigaction(SIGHUP, &sa, 0);
+        if (r == -1)
+            die();
     }
 
     int nclients = 0;
@@ -476,28 +501,19 @@ main(int argc, char **argv)
     struct pollvec pollvec[1];
     pollvec_init(pollvec);
 
-    int server = socket(AF_INET, SOCK_STREAM, 0);
-    check(server);
-
-    int dummy = 1;
-    check(setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &dummy, sizeof(dummy)));
-
-    struct sockaddr_in addr = {
-        AF_INET,
-        htons(config.port),
-        {htonl(INADDR_ANY)}
-    };
-    check(bind(server, (void *)&addr, sizeof(addr)));
-    check(listen(server, INT_MAX));
-
-    logmsg(LOG_DEBUG, "listen(port=%d)", config.port);
+    int server = server_create(config.port);
 
     srand(time(0));
     while (running) {
         if (reload) {
             /* Configuration reload requested (SIGHUP) */
+            int oldport = config.port;
             config_load(&config, config_file, 0);
             config_log(&config);
+            if (oldport != config.port) {
+                close(server);
+                server = server_create(config.port);
+            }
             reload = 0;
         }
 
