@@ -55,4 +55,5 @@ Port 22
 Delay 30000
 MaxLineLength 8
 MaxClients 512
+LogLevel 1
 ```

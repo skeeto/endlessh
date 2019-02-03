@@ -351,6 +351,7 @@ enum config_key {
     KEY_DELAY,
     KEY_MAX_LINE_LENGTH,
     KEY_MAX_CLIENTS,
+    KEY_LOG_LEVEL,
 };
 
 static enum config_key
@@ -361,6 +362,7 @@ config_key_parse(const char *tok)
         [KEY_DELAY]           = "Delay",
         [KEY_MAX_LINE_LENGTH] = "MaxLineLength",
         [KEY_MAX_CLIENTS]     = "MaxClients",
+        [KEY_LOG_LEVEL]       = "LogLevel",
     };
     for (size_t i = 1; i < sizeof(table) / sizeof(*table); i++)
         if (!strcmp(tok, table[i]))
@@ -428,6 +430,18 @@ config_load(struct config *c, const char *file, int hardfail)
                 case KEY_MAX_CLIENTS:
                     config_set_max_line_length(c, tokens[1], hardfail);
                     break;
+                case KEY_LOG_LEVEL: {
+                    errno = 0;
+                    char *end;
+                    long v = strtol(tokens[1], &end, 10);
+                    if (errno || *end || v < LOG_NONE || v > LOG_DEBUG) {
+                        fprintf(stderr, "%s:%ld: Invalid log level '%s'\n",
+                                file, lineno, tokens[1]);
+                        if (hardfail) exit(EXIT_FAILURE);
+                    } else {
+                        loglevel = v;
+                    }
+                } break;
             }
         }
 
