@@ -253,7 +253,8 @@ main(int argc, char **argv)
                 port = tmp;
                 break;
             case 'v':
-                loglevel++;
+                if (!loglevel++)
+                    setvbuf(stdout, 0, _IOLBF, 0);
                 break;
             default:
                 usage(stderr);
