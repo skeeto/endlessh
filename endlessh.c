@@ -141,7 +141,7 @@ check(int r)
 static int
 randline(char *line)
 {
-    int len = 1 + rand() % 252;
+    int len = 2 + rand() % 251;
     for (int i = 0; i < len - 2; i++)
         line[i] = 32 + rand() % 95;
     line[len - 2] = 13;
