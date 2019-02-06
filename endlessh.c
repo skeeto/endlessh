@@ -689,6 +689,7 @@ main(int argc, char **argv)
                         continue;  /* try again */
                     } else if (out == -1) {
                         client_destroy(client);
+                        break;
                     } else {
                         logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
                         client->bytes_sent += out;
