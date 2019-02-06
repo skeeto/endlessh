@@ -78,6 +78,7 @@ client_new(int fd, long long send_next)
 {
     struct client *c = malloc(sizeof(*c));
     if (c) {
+        c->ipaddr[0] = 0;
         c->connect_time = uepoch();
         c->send_next = send_next;
         c->bytes_sent = 0;
@@ -87,9 +88,7 @@ client_new(int fd, long long send_next)
         /* Get IP address */
         struct sockaddr_storage addr;
         socklen_t len = sizeof(addr);
-        if (getpeername(fd, (struct sockaddr*)&addr, &len) == -1) {
-            c->ipaddr[0] = 0;
-        } else {
+        if (getpeername(fd, (struct sockaddr*)&addr, &len) != -1) {
             if (addr.ss_family == AF_INET) {
                 struct sockaddr_in *s = (struct sockaddr_in *)&addr;
                 c->port = ntohs(s->sin_port);
