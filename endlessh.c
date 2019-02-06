@@ -88,7 +88,7 @@ client_new(int fd, long long send_next)
         /* Get IP address */
         struct sockaddr_storage addr;
         socklen_t len = sizeof(addr);
-        if (getpeername(fd, (struct sockaddr*)&addr, &len) != -1) {
+        if (getpeername(fd, (struct sockaddr *)&addr, &len) != -1) {
             if (addr.ss_family == AF_INET) {
                 struct sockaddr_in *s = (struct sockaddr_in *)&addr;
                 c->port = ntohs(s->sin_port);
