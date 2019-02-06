@@ -42,6 +42,8 @@ static void
 logmsg(enum loglevel level, const char *format, ...)
 {
     if (loglevel >= level) {
+        int save = errno;
+
         /* Print a timestamp */
         long long now = uepoch();
         time_t t = now / 1000;
@@ -56,6 +58,8 @@ logmsg(enum loglevel level, const char *format, ...)
         vprintf(format, ap);
         va_end(ap);
         fputc('\n', stdout);
+
+        errno = save;
     }
 }
 
