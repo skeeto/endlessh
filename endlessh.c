@@ -237,7 +237,7 @@ static unsigned
 rand16(unsigned long s[1])
 {
     s[0] = s[0] * 1103515245UL + 12345UL;
-    return s[0] >> 16;
+    return (s[0] >> 16) & 0xffff;
 }
 
 static int
