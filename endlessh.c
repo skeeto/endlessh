@@ -140,13 +140,19 @@ queue_remove(struct queue *q, int fd)
      * is virtually always one of the first few elements.
      */
     struct client *c;
-    struct client **prev = &q->head;
-    for (c = q->head; c; prev = &c->next, c = c->next) {
+    struct client *prev = 0;
+    for (c = q->head; c; prev = c, c = c->next) {
         if (c->fd == fd) {
-            q->length--;
-            if (q->tail == c)
-                q->tail = 0;
-            *prev = c->next;
+            if (!--q->length) {
+                q->head = q->tail = 0;
+            } else if (q->tail == c) {
+                q->tail = prev;
+                prev->next = 0;
+            } else if (prev) {
+                prev->next = c->next;
+            } else {
+                q->head = c->next;
+            }
             c->next = 0;
             break;
         }
@@ -666,10 +672,10 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 }
+                queue_append(queue, client);
                 logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
                         queue->length, config.max_clients);
-                queue_append(queue, client);
             }
         }
 
