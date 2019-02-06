@@ -610,7 +610,7 @@ main(int argc, char **argv)
         if (queue->length < config.max_clients)
             pollvec_push(pollvec, server, POLLIN);
         else
-            pollvec_push(pollvec, -1, POLLIN);
+            pollvec_push(pollvec, -1, 0);
 
         /* Enqueue clients that are due for another message */
         int timeout = -1;
