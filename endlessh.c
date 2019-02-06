@@ -85,6 +85,15 @@ client_new(int fd, long long send_next)
         c->next = 0;
         c->fd = fd;
 
+        /* Set the smallest possible recieve buffer. This reduces local
+         * resource usage and slows down the remote end.
+         */
+        int value = 1;
+        int r = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value));
+        logmsg(LOG_DEBUG, "setsockopt(%d, SO_RCVBUF, %d) = %d", fd, value, r);
+        if (r == -1)
+            logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+
         /* Get IP address */
         struct sockaddr_storage addr;
         socklen_t len = sizeof(addr);
@@ -499,7 +508,7 @@ server_create(int port)
     /* Socket options are best effort, allowed to fail */
     value = 1;
     r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
-    logmsg(LOG_DEBUG, "setsockopt(SO_REUSEADDR, true) = %d", r);
+    logmsg(LOG_DEBUG, "setsockopt(%d, SO_REUSEADDR, true) = %d", s, r);
     if (r == -1)
         logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
 
@@ -509,11 +518,11 @@ server_create(int port)
         .sin6_addr = in6addr_any
     };
     r = bind(s, (void *)&addr, sizeof(addr));
-    logmsg(LOG_DEBUG, "bind(port=%d) = %d", port, r);
+    logmsg(LOG_DEBUG, "bind(%d, port=%d) = %d", s, port, r);
     if (r == -1) die();
 
     r = listen(s, INT_MAX);
-    logmsg(LOG_DEBUG, "listen() = %d", r);
+    logmsg(LOG_DEBUG, "listen(%d) = %d", s, r);
     if (r == -1) die();
 
     return s;
