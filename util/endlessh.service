@@ -9,6 +9,10 @@ RestartSec=30sec
 ExecStart=/opt/endlessh/endlessh
 KillSignal=SIGTERM
 
+# Stop trying to restart the service if it restarts too many times in a row
+StartLimitInterval=5min
+StartLimitBurst=4
+
 StandardOutput=journal
 StandardError=journal
 StandardInput=null
