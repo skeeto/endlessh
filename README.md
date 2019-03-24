@@ -1,5 +1,7 @@
 # Endlessh: an SSH tarpit
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/mtlynch/endlessh.svg?maxAge=604800)](https://hub.docker.com/r/mtlynch/endlessh/)
+
 Endlessh is an SSH tarpit that *very* slowly sends an endless, random
 SSH banner. It keeps SSH clients locked up for hours or even days at a
 time. The purpose is to put your real SSH server on another port and
