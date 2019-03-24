@@ -15,6 +15,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#define ENDLESSH_VERSION           0.1
+
 #define DEFAULT_PORT              2222
 #define DEFAULT_DELAY            10000  /* milliseconds */
 #define DEFAULT_MAX_LINE_LENGTH     32
@@ -494,6 +496,13 @@ usage(FILE *f)
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
     fprintf(f, "  -v        Print diagnostics to standard output "
             "(repeatable)\n");
+    fprintf(f, "  -v        Print version information and exit\n");
+}
+
+static void
+print_version(void)
+{
+    puts("Endlessh " XSTR(ENDLESSH_VERSION));
 }
 
 static int
@@ -536,7 +545,7 @@ main(int argc, char **argv)
     config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "d:f:hl:m:p:v")) != -1) {
+    while ((option = getopt(argc, argv, "d:f:hl:m:p:vV")) != -1) {
         switch (option) {
             case 'd':
                 config_set_delay(&config, optarg, 1);
@@ -561,6 +570,10 @@ main(int argc, char **argv)
             case 'v':
                 if (!loglevel++)
                     setvbuf(stdout, 0, _IOLBF, 0);
+                break;
+            case 'V':
+                print_version();
+                exit(EXIT_SUCCESS);
                 break;
             default:
                 usage(stderr);
