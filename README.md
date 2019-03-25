@@ -68,3 +68,11 @@ MaxClients 4096
 #   2 = Very noisy debugging information
 LogLevel 0
 ```
+
+## Build issues
+
+RHEL 6 and CentOS 6 use a version of glibc older than 2.17 (December
+2012), and `clock_gettime(2)` is still in librt. For these systems you
+will need to link against librt:
+
+    make LDLIBS=-lrt
