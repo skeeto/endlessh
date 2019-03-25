@@ -514,7 +514,7 @@ usage(FILE *f)
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
     fprintf(f, "  -v        Print diagnostics to standard output "
             "(repeatable)\n");
-    fprintf(f, "  -v        Print version information and exit\n");
+    fprintf(f, "  -V        Print version information and exit\n");
 }
 
 static void
