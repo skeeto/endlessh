@@ -1,4 +1,22 @@
-#define _POSIX_C_SOURCE 200809L
+#ifdef __FreeBSD__
+#  define _WITH_GETLINE
+/* The MSG_DONTWAIT send(2) flag is non-standard, but widely available.
+ * However, FreeBSD doesn't define this flag when using POSIX feature
+ * test macros. Normally feature test macros are required to expose
+ * POSIX functionality, though FreeBSD isn't strict about this. In a
+ * sense it's technically correct to hide a non-standard flag when
+ * asking for strict standards compliance, but this behavior makes this
+ * flag impossible to use in portable programs, at least without this
+ * sort of special case.
+ *
+ * To get the prototype for getline(3), we need either a POSIX feature
+ * test macro or use the FreeBSD-specific _WITH_GETLINE macro. Since we
+ * can't use the former, we'll have to go with the latter.
+ */
+#else
+#  define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
