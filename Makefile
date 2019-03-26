@@ -1,8 +1,8 @@
 .POSIX:
 CC      = cc
-CFLAGS  = -std=c99 -Wall -Wextra -Wno-missing-field-initializers -xO4 -D_XPG6 -D__EXTENSIONS__=1
-LDFLAGS =
-LDLIBS  = -lsocket -lnsl -lrt
+CFLAGS  = -std=c99 -Wall -Wextra -Wno-missing-field-initializers -Os
+LDFLAGS = -ggdb3
+LDLIBS  =
 
 endlessh: endlessh.c
 	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ endlessh.c $(LDLIBS)

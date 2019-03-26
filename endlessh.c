@@ -417,7 +417,7 @@ config_load(struct config *c, const char *file, int hardfail)
         size_t len = 0;
         char *line = 0;
 	#ifdef __sun__	
-        while (fgets(&line, &len, f) != -1) {
+        while (fgets(line, len, f) != NULL) {
 	#else
         while (getline(&line, &len, f) != -1) {
 	#endif	
