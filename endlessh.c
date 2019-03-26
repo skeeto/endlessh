@@ -149,21 +149,21 @@ client_destroy(struct client *client)
     free(client);
 }
 
-struct queue {
+struct v_queue {
     struct client *head;
     struct client *tail;
     int length;
 };
 
 static void
-queue_init(struct queue *q)
+v_queue_init(struct v_queue *q)
 {
     q->head = q->tail = 0;
     q->length = 0;
 }
 
 static struct client *
-queue_remove(struct queue *q, int fd)
+v_queue_remove(struct v_queue *q, int fd)
 {
     /* Yes, this is a linear search, but the element we're looking for
      * is virtually always one of the first few elements.
@@ -190,7 +190,7 @@ queue_remove(struct queue *q, int fd)
 }
 
 static void
-queue_append(struct queue *q, struct client *c)
+v_queue_append(struct v_queue *q, struct client *c)
 {
     if (!q->tail) {
         q->head = q->tail = c;
@@ -202,7 +202,7 @@ queue_append(struct queue *q, struct client *c)
 }
 
 static void
-queue_destroy(struct queue *q)
+v_queue_destroy(struct v_queue *q)
 {
     struct client *c = q->head;
     while (c) {
@@ -416,7 +416,11 @@ config_load(struct config *c, const char *file, int hardfail)
     if (f) {
         size_t len = 0;
         char *line = 0;
+	#ifdef __sun__	
+        while (fgets(&line, &len, f) != -1) {
+	#else
         while (getline(&line, &len, f) != -1) {
+	#endif	
             lineno++;
 
             /* Remove comments */
@@ -622,8 +626,8 @@ main(int argc, char **argv)
             die();
     }
 
-    struct queue queue[1];
-    queue_init(queue);
+    struct v_queue v_queue[1];
+    v_queue_init(v_queue);
 
     struct pollvec pollvec[1];
     pollvec_init(pollvec);
@@ -647,7 +651,7 @@ main(int argc, char **argv)
 
         /* Enqueue the listening socket first */
         pollvec_clear(pollvec);
-        if (queue->length < config.max_clients)
+        if (v_queue->length < config.max_clients)
             pollvec_push(pollvec, server, POLLIN);
         else
             pollvec_push(pollvec, -1, 0);
@@ -655,7 +659,7 @@ main(int argc, char **argv)
         /* Enqueue clients that are due for another message */
         int timeout = -1;
         long long now = uepoch();
-        for (struct client *c = queue->head; c; c = c->next) {
+        for (struct client *c = v_queue->head; c; c = c->next) {
             if (c->send_next <= now) {
                 pollvec_push(pollvec, c->fd, POLLOUT);
             } else {
@@ -666,7 +670,7 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-                queue->length >= config.max_clients ? " (no accept)" : "");
+                v_queue->length >= config.max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
@@ -689,10 +693,10 @@ main(int argc, char **argv)
                 switch (errno) {
                     case EMFILE:
                     case ENFILE:
-                        config.max_clients = queue->length;
+                        config.max_clients = v_queue->length;
                         logmsg(LOG_INFO,
                                 "MaxClients %d",
-                                queue->length);
+                                v_queue->length);
                         break;
                     case ECONNABORTED:
                     case EINTR:
@@ -712,10 +716,10 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 }
-                queue_append(queue, client);
+                v_queue_append(v_queue, client);
                 logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
-                        queue->length, config.max_clients);
+                        v_queue->length, config.max_clients);
             }
         }
 
@@ -723,7 +727,7 @@ main(int argc, char **argv)
         for (size_t i = 1; i < pollvec->fill; i++) {
             short fd = pollvec->fds[i].fd;
             short revents = pollvec->fds[i].revents;
-            struct client *client = queue_remove(queue, fd);
+            struct client *client = v_queue_remove(v_queue, fd);
 
             if (revents & POLLHUP) {
                 client_destroy(client);
@@ -743,7 +747,7 @@ main(int argc, char **argv)
                         logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
                         client->bytes_sent += out;
                         client->send_next = uepoch() + config.delay;
-                        queue_append(queue, client);
+                        v_queue_append(v_queue, client);
                         break;
                     }
                 }
@@ -752,5 +756,5 @@ main(int argc, char **argv)
     }
 
     pollvec_free(pollvec);
-    queue_destroy(queue);
+    v_queue_destroy(v_queue);
 }
