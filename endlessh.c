@@ -41,6 +41,9 @@
 #define DEFAULT_MAX_CLIENTS       4096
 #define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
 
+#define FLAG_SPECIAL_SENT     (1 << 0)
+#define SPECIAL_MESSAGE       "Stay awhile and listen\r\n"
+
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
@@ -91,6 +94,7 @@ struct client {
     struct client *next;
     int port;
     int fd;
+    int flags;
 };
 
 static struct client *
@@ -104,6 +108,7 @@ client_new(int fd, long long send_next)
         c->bytes_sent = 0;
         c->next = 0;
         c->fd = fd;
+        c->flags = 0;
 
         /* Set the smallest possible recieve buffer. This reduces local
          * resource usage and slows down the remote end.
@@ -730,7 +735,15 @@ main(int argc, char **argv)
 
             } else if (revents & POLLOUT) {
                 char line[256];
-                int len = randline(line, config.max_line_length, &rng);
+                int len;
+                if (!(client->flags & FLAG_SPECIAL_SENT)) {
+                    static const char special[] = SPECIAL_MESSAGE;
+                    len = sizeof(special) - 1;
+                    memcpy(line, special, len);
+                    client->flags |= FLAG_SPECIAL_SENT;
+                } else {
+                    len = randline(line, config.max_line_length, &rng);
+                }
                 for (;;) {
                     /* Don't really care if send is short */
                     ssize_t out = send(fd, line, len, MSG_DONTWAIT);
