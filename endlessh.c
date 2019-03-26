@@ -1,4 +1,4 @@
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)
 #  define _WITH_GETLINE
 /* The MSG_DONTWAIT send(2) flag is non-standard, but widely available.
  * However, FreeBSD doesn't define this flag when using POSIX feature
@@ -13,6 +13,12 @@
  * test macro or use the FreeBSD-specific _WITH_GETLINE macro. Since we
  * can't use the former, we'll have to go with the latter.
  */
+#elif defined(__sun__)
+/* Solaris and its illumos derivatives consider getline(3) to be an
+ * extension despite this function being standardized by POSIX.1-2008
+ * more than a decade ago. As a workaround just enable all extensions.
+ */
+#  define __EXTENSIONS__
 #else
 #  define _POSIX_C_SOURCE 200809L
 #endif
@@ -416,11 +422,11 @@ config_load(struct config *c, const char *file, int hardfail)
     if (f) {
         size_t len = 0;
         char *line = 0;
-	#ifdef __sun__	
+	#if defined(__sun__)
         while (fgets(line, len, f) != NULL) {
 	#else
         while (getline(&line, &len, f) != -1) {
-	#endif	
+	#endif
             lineno++;
 
             /* Remove comments */
