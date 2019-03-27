@@ -1,0 +1,23 @@
+Solaris SMF installation
+========================
+
+Before installing SMF:
+
+1. Put endlessh binary to /usr/local/bin
+2. Edit endlessh.conf and put it to /usr/local/etc
+
+To install SMF:
+
+1. Put endlessh.xml to /var/svc/manifest/network
+2. Run svccfg import endlessh.xml
+3. Put init.endlessh to /lib/svc/method
+4. Run svcadm enable endlessh
+
+To uninstall SMF:
+
+1. Run svcadm disable endlessh
+2. rm -f /lib/svc/method/init.endlessh
+3. svccfg delete svc:/network/endlessh:default
+4. rm -f /var/svc/manifest/network/endlessh.xml
+
+Enjoy! :)

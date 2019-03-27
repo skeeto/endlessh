@@ -1,0 +1,134 @@
+#!/sbin/sh
+
+#
+# Control Method for endlessh (/lib/svc/method/init.endlessh)
+# Written by Yuri Voinov (C) 2007,2019
+#
+# ident "@(#)endlessh.sh    1.8    19/27/03 YV"
+#
+
+#############
+# Variables #
+#############
+
+# Base installation directory
+BASE_DIR="/usr/local"
+BASE_CONFIG_DIR=$BASE_DIR"/etc"
+
+# endlessh files paths  
+ENDLESSH_PATH="$BASE_DIR""/bin"
+ENDLESSH_CONF_PATH="$BASE_CONFIG_DIR"
+
+# endlessh files
+ENDLESSH_BIN_FILE="endlessh"
+ENDLESSH_CONF_FILE="endlessh.conf"
+
+# Daemon settings
+ENDLESSH_CONF="$ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE"
+
+#   
+# OS Commands location variables
+#
+CUT=`which cut`
+ECHO=`which echo`
+PKILL=`which kill`
+PGREP=`which pgrep`
+UNAME=`which uname`
+
+# OS release
+OS_VER=`$UNAME -r|$CUT -f2 -d"."`
+OS_NAME=`$UNAME -s|$CUT -f1 -d" "`
+
+###############
+# Subroutines #
+###############
+
+check_endlessh ()
+{
+ # Check endlessh installed
+ program=$1
+ if [ ! -f "$ENDLESSH_PATH/$program" -a ! -x "$ENDLESSH_PATH/$program" ]; then
+  $ECHO "ERROR: endlessh not found!"
+  $ECHO "Exiting..."
+  exit 1
+ fi
+}
+
+check_os ()
+{
+ # Check OS version
+ if [ ! "$OS_NAME" = "SunOS" -a ! "$OS_VER" -lt "10" ]; then
+  $ECHO "ERROR: Unsupported OS $OS_NAME $OS_VER"
+  $ECHO "Exiting..."
+  exit 1
+ fi
+}
+
+checkconf ()
+{
+# Check endlessh config file
+ config=$1
+ if [ -f "$ENDLESSH_CONF_PATH"/"$config" ]; then
+  $ECHO "1"
+ else
+  $ECHO "0"
+ fi  
+}
+
+startproc() 
+{
+# Start endlessh daemon
+ program=$1
+ if [ "`checkconf $ENDLESSH_CONF_FILE`" != "1" ]; then
+  $ECHO "ERROR: Config file $ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE not found."  
+  $ECHO "Exiting..."
+  exit 2
+ else
+  $ENDLESSH_PATH/$program -f $ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE &
+ fi
+}
+
+stopproc() 
+{
+# Stop endlessh daemon
+ program=$1
+ if [ "`checkconf $ENDLESSH_CONF_FILE`" != "1" ]; then
+  $ECHO "ERROR: Config file $ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE not found."  
+  $ECHO "Exiting..."
+  exit 2
+ else
+  $KILL -TERM `$PGREP $program`>/dev/null 2>&1
+ fi
+}
+
+##############
+# Main block #
+##############
+
+# Check endlessh installed
+check_endlessh $ENDLESSH_BIN_FILE
+
+# Check OS version
+check_os
+
+case "$1" in
+"start")
+  startproc $ENDLESSH_BIN_FILE
+  ;;
+"stop")
+  stopproc $ENDLESSH_BIN_FILE
+  ;;
+"refresh")
+  $KILL -HUP `$PGREP $ENDLESSH_BIN_FILE`>/dev/null 2>&1
+  ;;
+"restart")
+  stopproc $ENDLESSH_BIN_FILE
+  startproc $ENDLESSH_BIN_FILE
+  ;;
+*)
+  $ECHO "Usage: $0 { start | stop | restart | refresh }"
+  exit 1
+esac
+
+exit 0
+#
