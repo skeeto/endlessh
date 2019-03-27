@@ -1,28 +1,4 @@
-#if defined(__FreeBSD__)
-#  define _WITH_GETLINE
-/* The MSG_DONTWAIT send(2) flag is non-standard, but widely available.
- * However, FreeBSD doesn't define this flag when using POSIX feature
- * test macros. Normally feature test macros are required to expose
- * POSIX functionality, though FreeBSD isn't strict about this. In a
- * sense it's technically correct to hide a non-standard flag when
- * asking for strict standards compliance, but this behavior makes this
- * flag impossible to use in portable programs, at least without this
- * sort of special case.
- *
- * To get the prototype for getline(3), we need either a POSIX feature
- * test macro or use the FreeBSD-specific _WITH_GETLINE macro. Since we
- * can't use the former, we'll have to go with the latter.
- */
-#elif defined(__sun__)
-/* Solaris and its illumos derivatives consider getline(3) to be an
- * extension despite this function being standardized by POSIX.1-2008
- * more than a decade ago. As a workaround just enable all extensions.
- */
-#  define __EXTENSIONS__
-#else
-#  define _POSIX_C_SOURCE 200809L
-#endif
-
+#define _POSIX_C_SOURCE 200112L
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
@@ -33,6 +9,7 @@
 #include <string.h>
 
 #include <poll.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -169,30 +146,14 @@ fifo_init(struct fifo *q)
 }
 
 static struct client *
-fifo_remove(struct fifo *q, int fd)
+fifo_pop(struct fifo *q)
 {
-    /* Yes, this is a linear search, but the element we're looking for
-     * is virtually always one of the first few elements.
-     */
-    struct client *c;
-    struct client *prev = 0;
-    for (c = q->head; c; prev = c, c = c->next) {
-        if (c->fd == fd) {
-            if (!--q->length) {
-                q->head = q->tail = 0;
-            } else if (q->tail == c) {
-                q->tail = prev;
-                prev->next = 0;
-            } else if (prev) {
-                prev->next = c->next;
-            } else {
-                q->head = c->next;
-            }
-            c->next = 0;
-            break;
-        }
-    }
-    return c;
+    struct client *removed = q->head;
+    q->head = q->head->next;
+    removed->next = 0;
+    if (!--q->length)
+        q->tail = 0;
+    return removed;
 }
 
 static void
@@ -218,56 +179,6 @@ fifo_destroy(struct fifo *q)
     }
     q->head = q->tail = 0;
     q->length = 0;
-}
-
-struct pollvec {
-    size_t cap;
-    size_t fill;
-    struct pollfd *fds;
-};
-
-static void
-pollvec_init(struct pollvec *v)
-{
-    v->cap = 4;
-    v->fill = 0;
-    v->fds = malloc(v->cap * sizeof(v->fds[0]));
-    if (!v->fds) {
-        fprintf(stderr, "endlessh: pollvec initialization failed\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-static void
-pollvec_clear(struct pollvec *v)
-{
-    v->fill = 0;
-}
-
-static int
-pollvec_push(struct pollvec *v, int fd, short events)
-{
-    if (v->cap == v->fill) {
-        size_t size = v->cap * 2 * sizeof(v->fds[0]);
-        if (size < v->cap * sizeof(v->fds[0]))
-            return 0; // overflow
-        struct pollfd *grow = realloc(v->fds, size);
-        if (!grow)
-            return 0;
-        v->fds = grow;
-        v->cap *= 2;
-    }
-    v->fds[v->fill].fd = fd;
-    v->fds[v->fill].events = events;
-    v->fill++;
-    return 1;
-}
-
-static void
-pollvec_free(struct pollvec *v)
-{
-    free(v->fds);
-    v->fds = 0;
 }
 
 static void
@@ -420,9 +331,8 @@ config_load(struct config *c, const char *file, int hardfail)
     long lineno = 0;
     FILE *f = fopen(file, "r");
     if (f) {
-        size_t len = 0;
-        char *line = 0;
-        while (getline(&line, &len, f) != -1) {
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
             lineno++;
 
             /* Remove comments */
@@ -489,7 +399,6 @@ config_load(struct config *c, const char *file, int hardfail)
             }
         }
 
-        free(line);
         fclose(f);
     }
 }
@@ -559,6 +468,31 @@ server_create(int port)
     if (r == -1) die();
 
     return s;
+}
+
+/* Write a line to a client, returning client if it's still up. */
+static struct client *
+sendline(struct client *client, int max_line_length, unsigned long *rng)
+{
+    char line[256];
+    int len = randline(line, max_line_length, rng);
+    for (;;) {
+        ssize_t out = write(client->fd, line, len);
+        logmsg(LOG_DEBUG, "write(%d) = %d", client->fd, (int)out);
+        if (out == -1) {
+            if (errno == EINTR) {
+                continue;      /* try again */
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return client; /* don't care */
+            } else {
+                client_destroy(client);
+                return 0;
+            }
+        } else {
+            client->bytes_sent += out;
+            return client;
+        }
+    }
 }
 
 int
@@ -631,9 +565,6 @@ main(int argc, char **argv)
     struct fifo fifo[1];
     fifo_init(fifo);
 
-    struct pollvec pollvec[1];
-    pollvec_init(pollvec);
-
     unsigned long rng = uepoch();
 
     int server = server_create(config.port);
@@ -651,29 +582,27 @@ main(int argc, char **argv)
             reload = 0;
         }
 
-        /* Enqueue the listening socket first */
-        pollvec_clear(pollvec);
-        if (fifo->length < config.max_clients)
-            pollvec_push(pollvec, server, POLLIN);
-        else
-            pollvec_push(pollvec, -1, 0);
-
         /* Enqueue clients that are due for another message */
         int timeout = -1;
         long long now = uepoch();
-        for (struct client *c = fifo->head; c; c = c->next) {
-            if (c->send_next <= now) {
-                pollvec_push(pollvec, c->fd, POLLOUT);
+        while (fifo->head) {
+            if (fifo->head->send_next <= now) {
+                struct client *c = fifo_pop(fifo);
+                if (sendline(c, config.max_line_length, &rng)) {
+                    c->send_next = now + config.delay;
+                    fifo_append(fifo, c);
+                }
             } else {
-                timeout = c->send_next - now;
+                timeout = fifo->head->send_next - now;
                 break;
             }
         }
 
         /* Wait for next event */
-        logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-                fifo->length >= config.max_clients ? " (no accept)" : "");
-        int r = poll(pollvec->fds, pollvec->fill, timeout);
+        struct pollfd fds = {server, POLLIN, 0};
+        int nfds = fifo->length < config.max_clients;
+        logmsg(LOG_DEBUG, "poll(%d, %d)", nfds, timeout);
+        int r = poll(&fds, nfds, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
             switch (errno) {
@@ -687,7 +616,7 @@ main(int argc, char **argv)
         }
 
         /* Check for new incoming connections */
-        if (pollvec->fds[0].revents & POLLIN) {
+        if (fds.revents & POLLIN) {
             int fd = accept(server, 0, 0);
             logmsg(LOG_DEBUG, "accept() = %d", fd);
             if (fd == -1) {
@@ -712,8 +641,10 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
             } else {
-                long long send_next = uepoch() + config.delay / 2;
+                long long send_next = uepoch() + config.delay;
                 struct client *client = client_new(fd, send_next);
+                int flags = fcntl(fd, F_GETFL, 0);      /* cannot fail */
+                fcntl(fd, F_SETFL, flags | O_NONBLOCK); /* cannot fail */
                 if (!client) {
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
@@ -724,39 +655,7 @@ main(int argc, char **argv)
                         fifo->length, config.max_clients);
             }
         }
-
-        /* Write lines to ready clients */
-        for (size_t i = 1; i < pollvec->fill; i++) {
-            short fd = pollvec->fds[i].fd;
-            short revents = pollvec->fds[i].revents;
-            struct client *client = fifo_remove(fifo, fd);
-
-            if (revents & POLLHUP) {
-                client_destroy(client);
-
-            } else if (revents & POLLOUT) {
-                char line[256];
-                int len = randline(line, config.max_line_length, &rng);
-                for (;;) {
-                    /* Don't really care if send is short */
-                    ssize_t out = send(fd, line, len, MSG_DONTWAIT);
-                    if (out == -1 && errno == EINTR) {
-                        continue;  /* try again */
-                    } else if (out == -1) {
-                        client_destroy(client);
-                        break;
-                    } else {
-                        logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
-                        client->bytes_sent += out;
-                        client->send_next = uepoch() + config.delay;
-                        fifo_append(fifo, client);
-                        break;
-                    }
-                }
-            }
-        }
     }
 
-    pollvec_free(pollvec);
     fifo_destroy(fifo);
 }
