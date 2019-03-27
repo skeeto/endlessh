@@ -73,11 +73,27 @@ LogLevel 0
 
 ## Build issues
 
-RHEL 6 and CentOS 6 use a version of glibc older than 2.17 (December
-2012), and `clock_gettime(2)` is still in librt. For these systems you
-will need to link against librt:
+Some more esoteric systems require extra configuration when building.
+
+### RHEL 6 / CentOS 6
+
+This system uses a version of glibc older than 2.17 (December 2012), and
+`clock_gettime(2)` is still in librt. For these systems you will need to
+link against librt:
 
     make LDLIBS=-lrt
+
+### Solaris / illumos
+
+These systems don't include all the necessary functionality in libc and
+the linker requires some extra libraries:
+
+    make CC=gcc LDLIBS='-lnsl -lrt -lsocket'
+
+If you're not using GCC or Clang, also override `CFLAGS` and `LDFLAGS`
+to remove GCC-specific options. For example, on Solaris:
+
+    make CFLAGS=-fast LDFLAGS= LDLIBS='-lnsl -lrt -lsocket'
 
 
 [np]: https://nullprogram.com/blog/2019/03/22/

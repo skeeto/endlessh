@@ -1,4 +1,4 @@
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)
 #  define _WITH_GETLINE
 /* The MSG_DONTWAIT send(2) flag is non-standard, but widely available.
  * However, FreeBSD doesn't define this flag when using POSIX feature
@@ -13,6 +13,12 @@
  * test macro or use the FreeBSD-specific _WITH_GETLINE macro. Since we
  * can't use the former, we'll have to go with the latter.
  */
+#elif defined(__sun__)
+/* Solaris and its illumos derivatives consider getline(3) to be an
+ * extension despite this function being standardized by POSIX.1-2008
+ * more than a decade ago. As a workaround just enable all extensions.
+ */
+#  define __EXTENSIONS__
 #else
 #  define _POSIX_C_SOURCE 200809L
 #endif
@@ -149,21 +155,21 @@ client_destroy(struct client *client)
     free(client);
 }
 
-struct queue {
+struct fifo {
     struct client *head;
     struct client *tail;
     int length;
 };
 
 static void
-queue_init(struct queue *q)
+fifo_init(struct fifo *q)
 {
     q->head = q->tail = 0;
     q->length = 0;
 }
 
 static struct client *
-queue_remove(struct queue *q, int fd)
+fifo_remove(struct fifo *q, int fd)
 {
     /* Yes, this is a linear search, but the element we're looking for
      * is virtually always one of the first few elements.
@@ -190,7 +196,7 @@ queue_remove(struct queue *q, int fd)
 }
 
 static void
-queue_append(struct queue *q, struct client *c)
+fifo_append(struct fifo *q, struct client *c)
 {
     if (!q->tail) {
         q->head = q->tail = c;
@@ -202,7 +208,7 @@ queue_append(struct queue *q, struct client *c)
 }
 
 static void
-queue_destroy(struct queue *q)
+fifo_destroy(struct fifo *q)
 {
     struct client *c = q->head;
     while (c) {
@@ -622,8 +628,8 @@ main(int argc, char **argv)
             die();
     }
 
-    struct queue queue[1];
-    queue_init(queue);
+    struct fifo fifo[1];
+    fifo_init(fifo);
 
     struct pollvec pollvec[1];
     pollvec_init(pollvec);
@@ -647,7 +653,7 @@ main(int argc, char **argv)
 
         /* Enqueue the listening socket first */
         pollvec_clear(pollvec);
-        if (queue->length < config.max_clients)
+        if (fifo->length < config.max_clients)
             pollvec_push(pollvec, server, POLLIN);
         else
             pollvec_push(pollvec, -1, 0);
@@ -655,7 +661,7 @@ main(int argc, char **argv)
         /* Enqueue clients that are due for another message */
         int timeout = -1;
         long long now = uepoch();
-        for (struct client *c = queue->head; c; c = c->next) {
+        for (struct client *c = fifo->head; c; c = c->next) {
             if (c->send_next <= now) {
                 pollvec_push(pollvec, c->fd, POLLOUT);
             } else {
@@ -666,7 +672,7 @@ main(int argc, char **argv)
 
         /* Wait for next event */
         logmsg(LOG_DEBUG, "poll(%zu, %d)%s", pollvec->fill, timeout,
-                queue->length >= config.max_clients ? " (no accept)" : "");
+                fifo->length >= config.max_clients ? " (no accept)" : "");
         int r = poll(pollvec->fds, pollvec->fill, timeout);
         logmsg(LOG_DEBUG, "= %d", r);
         if (r == -1) {
@@ -689,10 +695,10 @@ main(int argc, char **argv)
                 switch (errno) {
                     case EMFILE:
                     case ENFILE:
-                        config.max_clients = queue->length;
+                        config.max_clients = fifo->length;
                         logmsg(LOG_INFO,
                                 "MaxClients %d",
-                                queue->length);
+                                fifo->length);
                         break;
                     case ECONNABORTED:
                     case EINTR:
@@ -712,10 +718,10 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 }
-                queue_append(queue, client);
+                fifo_append(fifo, client);
                 logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
-                        queue->length, config.max_clients);
+                        fifo->length, config.max_clients);
             }
         }
 
@@ -723,7 +729,7 @@ main(int argc, char **argv)
         for (size_t i = 1; i < pollvec->fill; i++) {
             short fd = pollvec->fds[i].fd;
             short revents = pollvec->fds[i].revents;
-            struct client *client = queue_remove(queue, fd);
+            struct client *client = fifo_remove(fifo, fd);
 
             if (revents & POLLHUP) {
                 client_destroy(client);
@@ -743,7 +749,7 @@ main(int argc, char **argv)
                         logmsg(LOG_DEBUG, "send(%d) = %d", fd, (int)out);
                         client->bytes_sent += out;
                         client->send_next = uepoch() + config.delay;
-                        queue_append(queue, client);
+                        fifo_append(fifo, client);
                         break;
                     }
                 }
@@ -752,5 +758,5 @@ main(int argc, char **argv)
     }
 
     pollvec_free(pollvec);
-    queue_destroy(queue);
+    fifo_destroy(fifo);
 }
