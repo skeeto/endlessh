@@ -13,6 +13,8 @@ To install SMF:
 3. Put init.endlessh to /lib/svc/method
 4. Run svcadm enable endlessh
 
+Note: Log will write to /var/log/endlessh.log by default.
+
 To uninstall SMF:
 
 1. Run svcadm disable endlessh

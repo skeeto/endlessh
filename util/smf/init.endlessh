@@ -21,17 +21,21 @@ ENDLESSH_CONF_PATH="$BASE_CONFIG_DIR"
 
 # endlessh files
 ENDLESSH_BIN_FILE="endlessh"
-ENDLESSH_CONF_FILE="endlessh.conf"
+ENDLESSH_CONF_FILE=$ENDLESSH_BIN_FILE".conf"
 
 # Daemon settings
 ENDLESSH_CONF="$ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE"
+
+# Log
+LOG_DIR="/var/log"
+LOGFILE=$LOG_DIR/$ENDLESSH_BIN_FILE".log"
 
 #   
 # OS Commands location variables
 #
 CUT=`which cut`
 ECHO=`which echo`
-PKILL=`which kill`
+KILL=`which kill`
 PGREP=`which pgrep`
 UNAME=`which uname`
 
@@ -84,7 +88,7 @@ startproc()
   $ECHO "Exiting..."
   exit 2
  else
-  $ENDLESSH_PATH/$program -f $ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE &
+  $ENDLESSH_PATH/$program -f $ENDLESSH_CONF_PATH/$ENDLESSH_CONF_FILE -v >$LOGFILE &
  fi
 }
 
@@ -97,7 +101,7 @@ stopproc()
   $ECHO "Exiting..."
   exit 2
  else
-  $KILL -TERM `$PGREP $program`>/dev/null 2>&1
+  $KILL -s TERM `$PGREP $program`>/dev/null 2>&1
  fi
 }
 
@@ -119,7 +123,7 @@ case "$1" in
   stopproc $ENDLESSH_BIN_FILE
   ;;
 "refresh")
-  $KILL -HUP `$PGREP $ENDLESSH_BIN_FILE`>/dev/null 2>&1
+  $KILL -s HUP `$PGREP $ENDLESSH_BIN_FILE`>/dev/null 2>&1
   ;;
 "restart")
   stopproc $ENDLESSH_BIN_FILE
@@ -131,4 +135,3 @@ case "$1" in
 esac
 
 exit 0
-#
