@@ -19,6 +19,8 @@ Usage information is printed with `-h`.
 
 ```
 Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
+  -4        Bind to IPv4 only
+  -6        Bind to IPv6 only
   -d INT    Message millisecond delay [10000]
   -f        Set and load config file [/etc/endlessh/config]
   -h        Print this help message and exit
@@ -69,6 +71,12 @@ MaxClients 4096
 #   1 = Standard, useful log messages
 #   2 = Very noisy debugging information
 LogLevel 0
+
+# Set the family of the listening socket
+#   0 = Use IPv4 Mapped IPv6 (Both v4 and v6, default)
+#   4 = Use IPv4 only
+#   6 = Use IPv6 only
+BindFamily 0
 ```
 
 ## Build issues

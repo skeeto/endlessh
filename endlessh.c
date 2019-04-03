@@ -23,6 +23,7 @@
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
 #define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
+#define DEFAULT_BIND_FAMILY  AF_UNSPEC
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
@@ -87,6 +88,7 @@ client_new(int fd, long long send_next)
         c->bytes_sent = 0;
         c->next = 0;
         c->fd = fd;
+        c->port = 0;
 
         /* Set the smallest possible recieve buffer. This reduces local
          * resource usage and slows down the remote end.
@@ -231,6 +233,7 @@ struct config {
     int delay;
     int max_line_length;
     int max_clients;
+    int bind_family;
 };
 
 #define CONFIG_DEFAULT { \
@@ -238,6 +241,7 @@ struct config {
     .delay           = DEFAULT_DELAY, \
     .max_line_length = DEFAULT_MAX_LINE_LENGTH, \
     .max_clients     = DEFAULT_MAX_CLIENTS, \
+    .bind_family     = DEFAULT_BIND_FAMILY, \
 }
 
 static void
@@ -300,6 +304,27 @@ config_set_max_line_length(struct config *c, const char *s, int hardfail)
     }
 }
 
+static void
+config_set_bind_family(struct config *c, const char *s, int hardfail)
+{
+  switch (*s) {
+      case '4':
+          c->bind_family = AF_INET;
+          break;
+      case '6':
+          c->bind_family = AF_INET6;
+          break;
+      case '0':
+          c->bind_family = AF_UNSPEC;
+          break;
+      default:
+          fprintf(stderr, "endlessh: Invalid address family: %s\n", s);
+          if (hardfail)
+              exit(EXIT_FAILURE);
+          break;
+  }
+}
+
 enum config_key {
     KEY_INVALID,
     KEY_PORT,
@@ -307,6 +332,7 @@ enum config_key {
     KEY_MAX_LINE_LENGTH,
     KEY_MAX_CLIENTS,
     KEY_LOG_LEVEL,
+    KEY_BIND_FAMILY,
 };
 
 static enum config_key
@@ -318,6 +344,7 @@ config_key_parse(const char *tok)
         [KEY_MAX_LINE_LENGTH] = "MaxLineLength",
         [KEY_MAX_CLIENTS]     = "MaxClients",
         [KEY_LOG_LEVEL]       = "LogLevel",
+        [KEY_BIND_FAMILY]     = "BindFamily"
     };
     for (size_t i = 1; i < sizeof(table) / sizeof(*table); i++)
         if (!strcmp(tok, table[i]))
@@ -384,6 +411,9 @@ config_load(struct config *c, const char *file, int hardfail)
                 case KEY_MAX_CLIENTS:
                     config_set_max_clients(c, tokens[1], hardfail);
                     break;
+                case KEY_BIND_FAMILY:
+                    config_set_bind_family(c, tokens[1], hardfail);
+                    break;
                 case KEY_LOG_LEVEL: {
                     errno = 0;
                     char *end;
@@ -410,13 +440,19 @@ config_log(const struct config *c)
     logmsg(LOG_INFO, "Delay %ld", c->delay);
     logmsg(LOG_INFO, "MaxLineLength %d", c->max_line_length);
     logmsg(LOG_INFO, "MaxClients %d", c->max_clients);
+    logmsg(LOG_INFO, "BindFamily %s",
+        c->bind_family == AF_INET6 ? "IPv6 Only" :
+        c->bind_family == AF_INET  ? "IPv4 Only" :
+                                "IPv4 Mapped IPv6");
 }
 
 static void
 usage(FILE *f)
 {
-    fprintf(f, "Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] "
+    fprintf(f, "Usage: endlessh [-vh] [-46] [-d MS] [-f CONFIG] [-l LEN] "
                                "[-m LIMIT] [-p PORT]\n");
+    fprintf(f, "  -4        Bind to IPv4 only");
+    fprintf(f, "  -6        Bind to IPv6 only");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
     fprintf(f, "  -f        Set and load config file ["
@@ -439,11 +475,11 @@ print_version(void)
 }
 
 static int
-server_create(int port)
+server_create(int port, int family)
 {
     int r, s, value;
 
-    s = socket(AF_INET6, SOCK_STREAM, 0);
+    s = socket(family == AF_UNSPEC ? AF_INET6 : family, SOCK_STREAM, 0);
     logmsg(LOG_DEBUG, "socket() = %d", s);
     if (s == -1) die();
 
@@ -454,12 +490,37 @@ server_create(int port)
     if (r == -1)
         logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
 
-    struct sockaddr_in6 addr = {
-        .sin6_family = AF_INET6,
-        .sin6_port = htons(port),
-        .sin6_addr = in6addr_any
-    };
-    r = bind(s, (void *)&addr, sizeof(addr));
+    /*
+     * With OpenBSD IPv6 sockets are always IPv6-only, so the socket option
+     * is read-only (not modifiable).
+     * http://man.openbsd.org/ip6#IPV6_V6ONLY
+     */
+#ifndef __OpenBSD__
+    if (family == AF_INET6 || family == AF_UNSPEC) {
+        errno = 0;
+        value = (family == AF_INET6);
+        r = setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &value, sizeof(value));
+        logmsg(LOG_DEBUG, "setsockopt(%d, IPV6_V6ONLY, true) = %d", s, r);
+        if (r == -1)
+            logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+    }
+#endif
+
+    if (family == AF_INET) {
+        struct sockaddr_in addr4 = {
+            .sin_family = AF_INET,
+            .sin_port = htons(port),
+            .sin_addr = {INADDR_ANY}
+        };
+        r = bind(s, (void *)&addr4, sizeof(addr4));
+    } else {
+        struct sockaddr_in6 addr6 = {
+            .sin6_family = AF_INET6,
+            .sin6_port = htons(port),
+            .sin6_addr = in6addr_any
+        };
+        r = bind(s, (void *)&addr6, sizeof(addr6));
+    }
     logmsg(LOG_DEBUG, "bind(%d, port=%d) = %d", s, port, r);
     if (r == -1) die();
 
@@ -503,8 +564,14 @@ main(int argc, char **argv)
     config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "d:f:hl:m:p:vV")) != -1) {
+    while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
         switch (option) {
+            case '4':
+                config_set_bind_family(&config, "4", 1);
+                break;
+            case '6':
+                config_set_bind_family(&config, "6", 1);
+                break;
             case 'd':
                 config_set_delay(&config, optarg, 1);
                 break;
@@ -567,17 +634,18 @@ main(int argc, char **argv)
 
     unsigned long rng = uepoch();
 
-    int server = server_create(config.port);
+    int server = server_create(config.port, config.bind_family);
 
     while (running) {
         if (reload) {
             /* Configuration reload requested (SIGHUP) */
             int oldport = config.port;
+            int oldfamily = config.bind_family;
             config_load(&config, config_file, 0);
             config_log(&config);
-            if (oldport != config.port) {
+            if (oldport != config.port || oldfamily != config.bind_family) {
                 close(server);
-                server = server_create(config.port);
+                server = server_create(config.port, config.bind_family);
             }
             reload = 0;
         }
