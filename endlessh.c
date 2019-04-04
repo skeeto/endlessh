@@ -451,8 +451,8 @@ usage(FILE *f)
 {
     fprintf(f, "Usage: endlessh [-vh] [-46] [-d MS] [-f CONFIG] [-l LEN] "
                                "[-m LIMIT] [-p PORT]\n");
-    fprintf(f, "  -4        Bind to IPv4 only");
-    fprintf(f, "  -6        Bind to IPv6 only");
+    fprintf(f, "  -4        Bind to IPv4 only\n");
+    fprintf(f, "  -6        Bind to IPv6 only\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
     fprintf(f, "  -f        Set and load config file ["
