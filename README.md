@@ -103,5 +103,8 @@ to remove GCC-specific options. For example, on Solaris:
 
     make CFLAGS=-fast LDFLAGS= LDLIBS='-lnsl -lrt -lsocket'
 
+The feature test macros on these systems isn't reliable, so you may also
+need to use `-D__EXTENSIONS__` in `CFLAGS`.
+
 
 [np]: https://nullprogram.com/blog/2019/03/22/
