@@ -78,8 +78,12 @@ struct client {
 };
 
 struct stats {
-	long long connects;
+    long long connects;
+    long long bytes_wasted;
+    long long time_wasted;
 };
+
+struct stats *s;
 
 static struct client *
 client_new(int fd, long long send_next)
@@ -134,6 +138,7 @@ client_destroy(struct client *client)
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
             client->bytes_sent);
+    s->time_wasted += dt / 1000;
     close(client->fd);
     free(client);
 }
@@ -564,10 +569,12 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
             }
         } else {
             client->bytes_sent += out;
+            s->bytes_wasted += out;
             return client;
         }
     }
 }
+
 
 int
 main(int argc, char **argv)
@@ -575,7 +582,11 @@ main(int argc, char **argv)
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
-    struct stats *s = malloc(sizeof(*s));
+
+    s = malloc(sizeof(*s));
+    s->connects = 0;
+    s->bytes_wasted = 0;
+    s->time_wasted = 0;
 
     int option;
     while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
@@ -671,7 +682,8 @@ main(int argc, char **argv)
         }
         if (dumpstats) {
             /* print stats requested (SIGUSR1) */
-            logmsg(LOG_INFO, "Connections received: %lld", s->connects);
+            logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
+                    s->connects, s->time_wasted, s->bytes_wasted);
             dumpstats = 0;
         }
 
@@ -750,6 +762,7 @@ main(int argc, char **argv)
             }
         }
     }
-    logmsg(LOG_INFO, "Connections received in total: %lld", s->connects);
+    logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
+			s->connects, s->time_wasted, s->bytes_wasted);
     fifo_destroy(fifo);
 }
