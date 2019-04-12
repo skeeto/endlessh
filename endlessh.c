@@ -77,6 +77,10 @@ struct client {
     int fd;
 };
 
+struct stats {
+	long long connects;
+};
+
 static struct client *
 client_new(int fd, long long send_next)
 {
@@ -226,6 +230,15 @@ sighup_handler(int signal)
 {
     (void)signal;
     reload = 1;
+}
+
+static volatile sig_atomic_t dumpstats = 0;
+
+static void
+sigusr1_handler(int signal)
+{
+    (void)signal;
+    dumpstats = 1;
 }
 
 struct config {
@@ -562,6 +575,7 @@ main(int argc, char **argv)
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
+    struct stats *s = malloc(sizeof(*s));
 
     int option;
     while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
@@ -628,6 +642,12 @@ main(int argc, char **argv)
         if (r == -1)
             die();
     }
+    {
+        struct sigaction sa = {.sa_handler = sigusr1_handler};
+        int r = sigaction(SIGUSR1, &sa, 0);
+        if (r == -1)
+            die();
+    }
 
     struct fifo fifo[1];
     fifo_init(fifo);
@@ -648,6 +668,11 @@ main(int argc, char **argv)
                 server = server_create(config.port, config.bind_family);
             }
             reload = 0;
+        }
+        if (dumpstats) {
+            /* print stats requested (SIGUSR1) */
+            logmsg(LOG_INFO, "Connections received: %lld", s->connects);
+            dumpstats = 0;
         }
 
         /* Enqueue clients that are due for another message */
@@ -687,6 +712,7 @@ main(int argc, char **argv)
         if (fds.revents & POLLIN) {
             int fd = accept(server, 0, 0);
             logmsg(LOG_DEBUG, "accept() = %d", fd);
+            s->connects++;
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
@@ -724,6 +750,6 @@ main(int argc, char **argv)
             }
         }
     }
-
+    logmsg(LOG_INFO, "Connections received in total: %lld", s->connects);
     fifo_destroy(fifo);
 }
