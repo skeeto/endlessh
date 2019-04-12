@@ -45,7 +45,7 @@ write a complete, consistent log.
 
 A SIGHUP signal requests a reload of the configuration file (`-f`).
 
-A SIGUSR1 signal will print connections stats to standard output.
+A SIGUSR1 signal will print connections stats to the log.
 
 ## Sample Configuration File
 

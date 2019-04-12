@@ -67,6 +67,12 @@ logmsg(enum loglevel level, const char *format, ...)
     }
 }
 
+struct {
+    long long connects;
+    long long milliseconds;
+    long long bytes_sent;
+} statistics;
+
 struct client {
     char ipaddr[INET6_ADDRSTRLEN];
     long long connect_time;
@@ -76,14 +82,6 @@ struct client {
     int port;
     int fd;
 };
-
-struct stats {
-    long long connects;
-    long long bytes_wasted;
-    long long time_wasted;
-};
-
-struct stats *s;
 
 static struct client *
 client_new(int fd, long long send_next)
@@ -138,9 +136,22 @@ client_destroy(struct client *client)
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
             client->bytes_sent);
-    s->time_wasted += dt / 1000;
+    statistics.milliseconds += dt;
     close(client->fd);
     free(client);
+}
+
+static void
+statistics_log_totals(struct client *clients)
+{
+    long long milliseconds = statistics.milliseconds;
+    for (long long now = epochms(); clients; clients = clients->next)
+        milliseconds += now - clients->connect_time;
+    logmsg(LOG_INFO, "TOTALS connects=%lld seconds=%lld.%lld bytes=%lld",
+           statistics.connects,
+           milliseconds / 1000,
+           milliseconds % 1000,
+           statistics.bytes_sent);
 }
 
 struct fifo {
@@ -569,7 +580,7 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
             }
         } else {
             client->bytes_sent += out;
-            s->bytes_wasted += out;
+            statistics.bytes_sent += out;
             return client;
         }
     }
@@ -582,11 +593,6 @@ main(int argc, char **argv)
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
-
-    s = malloc(sizeof(*s));
-    s->connects = 0;
-    s->bytes_wasted = 0;
-    s->time_wasted = 0;
 
     int option;
     while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
@@ -682,8 +688,7 @@ main(int argc, char **argv)
         }
         if (dumpstats) {
             /* print stats requested (SIGUSR1) */
-            logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
-                    s->connects, s->time_wasted, s->bytes_wasted);
+            statistics_log_totals(fifo->head);
             dumpstats = 0;
         }
 
@@ -724,7 +729,7 @@ main(int argc, char **argv)
         if (fds.revents & POLLIN) {
             int fd = accept(server, 0, 0);
             logmsg(LOG_DEBUG, "accept() = %d", fd);
-            s->connects++;
+            statistics.connects++;
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
@@ -756,13 +761,13 @@ main(int argc, char **argv)
                     close(fd);
                 }
                 fifo_append(fifo, client);
-                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d/%lld",
+                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                         client->ipaddr, client->port, client->fd,
-                        fifo->length, config.max_clients, s->connects);
+                        fifo->length, config.max_clients);
             }
         }
     }
-    logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
-			s->connects, s->time_wasted, s->bytes_wasted);
+
     fifo_destroy(fifo);
+    statistics_log_totals(0);
 }

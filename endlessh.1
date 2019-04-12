@@ -70,9 +70,9 @@ If
 receives the SIGTERM signal it will gracefully shut
 down the daemon, allowing it to write a complete, consistent log.
 .Pp
-A SIGHUP signal requests
-.Nm
-a reload of its configuration file.
+A SIGHUP signal requests a reload of its configuration file.
+.Pp
+A SIGUSR1 signal will print connections stats to the log.
 .Sh FILES
 .Bl -tag -width /etc/endlessh/config -compact
 .It Pa /etc/endlessh/config
