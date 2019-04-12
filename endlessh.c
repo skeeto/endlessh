@@ -77,6 +77,14 @@ struct client {
     int fd;
 };
 
+struct stats {
+    long long connects;
+    long long bytes_wasted;
+    long long time_wasted;
+};
+
+struct stats *s;
+
 static struct client *
 client_new(int fd, long long send_next)
 {
@@ -130,6 +138,7 @@ client_destroy(struct client *client)
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
             client->bytes_sent);
+    s->time_wasted += dt / 1000;
     close(client->fd);
     free(client);
 }
@@ -226,6 +235,15 @@ sighup_handler(int signal)
 {
     (void)signal;
     reload = 1;
+}
+
+static volatile sig_atomic_t dumpstats = 0;
+
+static void
+sigusr1_handler(int signal)
+{
+    (void)signal;
+    dumpstats = 1;
 }
 
 struct config {
@@ -551,10 +569,12 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
             }
         } else {
             client->bytes_sent += out;
+            s->bytes_wasted += out;
             return client;
         }
     }
 }
+
 
 int
 main(int argc, char **argv)
@@ -562,6 +582,11 @@ main(int argc, char **argv)
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
+
+    s = malloc(sizeof(*s));
+    s->connects = 0;
+    s->bytes_wasted = 0;
+    s->time_wasted = 0;
 
     int option;
     while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
@@ -628,6 +653,12 @@ main(int argc, char **argv)
         if (r == -1)
             die();
     }
+    {
+        struct sigaction sa = {.sa_handler = sigusr1_handler};
+        int r = sigaction(SIGUSR1, &sa, 0);
+        if (r == -1)
+            die();
+    }
 
     struct fifo fifo[1];
     fifo_init(fifo);
@@ -648,6 +679,12 @@ main(int argc, char **argv)
                 server = server_create(config.port, config.bind_family);
             }
             reload = 0;
+        }
+        if (dumpstats) {
+            /* print stats requested (SIGUSR1) */
+            logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
+                    s->connects, s->time_wasted, s->bytes_wasted);
+            dumpstats = 0;
         }
 
         /* Enqueue clients that are due for another message */
@@ -687,6 +724,7 @@ main(int argc, char **argv)
         if (fds.revents & POLLIN) {
             int fd = accept(server, 0, 0);
             logmsg(LOG_DEBUG, "accept() = %d", fd);
+            s->connects++;
             if (fd == -1) {
                 const char *msg = strerror(errno);
                 switch (errno) {
@@ -718,12 +756,13 @@ main(int argc, char **argv)
                     close(fd);
                 }
                 fifo_append(fifo, client);
-                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
+                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d/%lld",
                         client->ipaddr, client->port, client->fd,
-                        fifo->length, config.max_clients);
+                        fifo->length, config.max_clients, s->connects);
             }
         }
     }
-
+    logmsg(LOG_INFO, "Connections received in total: %lld\tWasted seconds total: %lld\tWasted bytes total: %lld",
+			s->connects, s->time_wasted, s->bytes_wasted);
     fifo_destroy(fifo);
 }
