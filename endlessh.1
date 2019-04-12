@@ -1,0 +1,81 @@
+.Dd $Mdocdate: April 12 2019 $
+.Dt ENDLESSH 1 
+.Os
+.Sh NAME
+.Nm endless
+.Nd An SSH tarpit
+.Sh SYNOPSIS
+.Nm endless
+.Op Fl 46chvV
+.Op Fl d Ar delay
+.Op Fl f Ar config 
+.Op Fl l Ar max banner length
+.Op Fl m Ar max clients
+.Op Fl p Ar port
+.Sh DESCRIPTION
+.Nm
+is an SSH tarpit that very slowly 
+sends an endless, random SSH banner.
+.Pp
+.Nm
+keeps SSH clients locked up for hours or even days at a time.
+The purpose is to put your real SSH server on another port
+and then let the script kiddies get stuck in this tarpit 
+instead of bothering a real server.
+.Pp
+Since the tarpit is in the banner before any cryptographic
+exchange occurs, this program doesn't depend on any cryptographic
+libraries. It's a simple, single-threaded, standalone C program.
+It uses poll() to trap multiple clients at a time.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl 4
+Forces
+.Nm
+to use IPv4 addresses only.
+.It Fl 6
+Forces
+.Nm
+to use IPv6 addresses only.
+.It Fl d Ar delay
+Message milliseconds delay. Default: 10000
+.It Fl f Ar config
+Set and load config file.
+By default
+.Nm
+looks for /etc/endlessh/config.
+.It Fl h
+Print the help message and exit.
+.It Fl l Ar max banner length
+Maximum banner line length (3-255). Default: 32
+.It Fl m Ar max clients
+Maximum number of clients. Default: 4096
+.It Fl p Ar port
+Set the listening port. By default
+.Nm
+listens on port 2222.
+.It Fl v
+Print diagnostics to standard output. Can be specified
+numerous times to increase verbosity.
+.It Fl V
+Causes
+.Nm
+to print version information and exit.
+.El
+.El
+.Pp
+If
+.Nm
+receives the SIGTERM signal it will gracefully shut
+down the daemon, allowing it to write a complete, consistent log.
+.Pp
+A SIGHUP signal requests
+.Nm
+a reload of its configuration file.
+.Sh FILES
+.Bl -tag -width /etc/endlessh/config -compact
+.It Pa /etc/endlessh/config
+The default
+.Nm
+configuration file.
