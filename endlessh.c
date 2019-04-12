@@ -756,9 +756,9 @@ main(int argc, char **argv)
                     close(fd);
                 }
                 fifo_append(fifo, client);
-                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
+                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d/%lld",
                         client->ipaddr, client->port, client->fd,
-                        fifo->length, config.max_clients);
+                        fifo->length, config.max_clients, s->connects);
             }
         }
     }
