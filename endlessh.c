@@ -29,7 +29,7 @@
 #define STR(s) #s
 
 static long long
-uepoch(void)
+epochms(void)
 {
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
@@ -49,7 +49,7 @@ logmsg(enum loglevel level, const char *format, ...)
         int save = errno;
 
         /* Print a timestamp */
-        long long now = uepoch();
+        long long now = epochms();
         time_t t = now / 1000;
         char date[64];
         struct tm tm[1];
@@ -91,7 +91,7 @@ client_new(int fd, long long send_next)
     struct client *c = malloc(sizeof(*c));
     if (c) {
         c->ipaddr[0] = 0;
-        c->connect_time = uepoch();
+        c->connect_time = epochms();
         c->send_next = send_next;
         c->bytes_sent = 0;
         c->next = 0;
@@ -131,7 +131,7 @@ static void
 client_destroy(struct client *client)
 {
     logmsg(LOG_DEBUG, "close(%d)", client->fd);
-    long long dt = uepoch() - client->connect_time;
+    long long dt = epochms() - client->connect_time;
     logmsg(LOG_INFO,
             "CLOSE host=%s port=%d fd=%d "
             "time=%lld.%03lld bytes=%lld",
@@ -663,7 +663,7 @@ main(int argc, char **argv)
     struct fifo fifo[1];
     fifo_init(fifo);
 
-    unsigned long rng = uepoch();
+    unsigned long rng = epochms();
 
     int server = server_create(config.port, config.bind_family);
 
@@ -689,7 +689,7 @@ main(int argc, char **argv)
 
         /* Enqueue clients that are due for another message */
         int timeout = -1;
-        long long now = uepoch();
+        long long now = epochms();
         while (fifo->head) {
             if (fifo->head->send_next <= now) {
                 struct client *c = fifo_pop(fifo);
@@ -747,7 +747,7 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
             } else {
-                long long send_next = uepoch() + config.delay;
+                long long send_next = epochms() + config.delay;
                 struct client *client = client_new(fd, send_next);
                 int flags = fcntl(fd, F_GETFL, 0);      /* cannot fail */
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK); /* cannot fail */
