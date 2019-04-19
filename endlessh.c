@@ -624,8 +624,7 @@ main(int argc, char **argv)
                 config_set_port(&config, optarg, 1);
                 break;
             case 'v':
-                if (!loglevel++)
-                    setvbuf(stdout, 0, _IOLBF, 0);
+                loglevel++;
                 break;
             case 'V':
                 print_version();
@@ -641,6 +640,9 @@ main(int argc, char **argv)
         fprintf(stderr, "endlessh: too many arguments\n");
         exit(EXIT_FAILURE);
     }
+
+    /* Set output (log) to line buffered */
+    setvbuf(stdout, 0, _IOLBF, 0);
 
     /* Log configuration */
     config_log(&config);
