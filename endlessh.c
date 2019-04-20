@@ -147,7 +147,7 @@ statistics_log_totals(struct client *clients)
     long long milliseconds = statistics.milliseconds;
     for (long long now = epochms(); clients; clients = clients->next)
         milliseconds += now - clients->connect_time;
-    logmsg(LOG_INFO, "TOTALS connects=%lld seconds=%lld.%lld bytes=%lld",
+    logmsg(LOG_INFO, "TOTALS connects=%lld seconds=%lld.%03lld bytes=%lld",
            statistics.connects,
            milliseconds / 1000,
            milliseconds % 1000,
