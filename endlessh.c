@@ -16,7 +16,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#define ENDLESSH_VERSION           0.1
+#define ENDLESSH_VERSION           1.0
 
 #define DEFAULT_PORT              2222
 #define DEFAULT_DELAY            10000  /* milliseconds */
