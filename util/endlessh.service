@@ -6,7 +6,7 @@ Requires=network-online.target
 Type=simple
 Restart=always
 RestartSec=30sec
-ExecStart=/opt/endlessh/endlessh
+ExecStart=/usr/local/bin/endlessh
 KillSignal=SIGTERM
 
 # Stop trying to restart the service if it restarts too many times in a row
