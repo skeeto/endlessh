@@ -27,7 +27,7 @@ ProtectHome=true
 ##     setcap 'cap_net_bind_service=+ep' /usr/local/bin/endlessh
 ## 2) uncomment following line
 #AmbientCapabilities=CAP_NET_BIND_SERVICE
-## 4) comment following line
+## 3) comment following line
 PrivateUsers=true
 
 NoNewPrivileges=true
