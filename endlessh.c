@@ -24,7 +24,7 @@
 #define DEFAULT_MAX_CLIENTS       4096
 
 #if (defined(__FreeBSD__))
-# define DEFAULT_CONFIG_FILE      "/usr/local/etc/endlessh"
+# define DEFAULT_CONFIG_FILE      "/usr/local/etc/endlessh.config"
 #else
 # define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
 #endif
