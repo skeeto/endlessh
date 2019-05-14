@@ -22,7 +22,13 @@
 #define DEFAULT_DELAY            10000  /* milliseconds */
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
-#define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
+
+#if (defined(__FreeBSD__))
+# define DEFAULT_CONFIG_FILE      "/usr/local/etc/endlessh"
+#else
+# define DEFAULT_CONFIG_FILE      "/etc/endlessh/config"
+#endif
+
 #define DEFAULT_BIND_FAMILY  AF_UNSPEC
 
 #define XSTR(s) STR(s)
