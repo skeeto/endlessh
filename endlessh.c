@@ -1,4 +1,9 @@
+#if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__))
+#define _BSD_SOURCE
+#else
 #define _XOPEN_SOURCE 600
+#endif
+
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
@@ -8,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <err.h>
 #include <poll.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -596,6 +602,14 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
 int
 main(int argc, char **argv)
 {
+
+#if (defined(__OpenBSD__))
+
+    if (pledge("inet stdio rpath",NULL) == -1)
+        err(EXIT_FAILURE,"pledge");
+
+#endif
+
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
