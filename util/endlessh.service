@@ -1,5 +1,6 @@
 [Unit]
 Description=Endlessh SSH Tarpit
+Documentation=man:endlessh(1)
 Requires=network-online.target
 
 [Service]
