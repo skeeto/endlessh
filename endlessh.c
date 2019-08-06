@@ -1,5 +1,5 @@
 #if defined(__OpenBSD__)
-#  define _BSD_SOURCE  /* for pledge(2) */
+#  define _BSD_SOURCE  /* for pledge(2) and unveil(2) */
 #else
 #  define _XOPEN_SOURCE 600
 #endif
@@ -601,13 +601,15 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
 int
 main(int argc, char **argv)
 {
-#if (defined(__OpenBSD__))
-    if (pledge("inet stdio rpath", NULL) == -1)
+    struct config config = CONFIG_DEFAULT;
+    const char *config_file = DEFAULT_CONFIG_FILE;
+
+#if defined(__OpenBSD__)
+    unveil(config_file, "r"); /* return ignored as the file may not exist */
+    if (pledge("inet stdio rpath unveil", 0) == -1)
         die();
 #endif
 
-    struct config config = CONFIG_DEFAULT;
-    const char *config_file = DEFAULT_CONFIG_FILE;
     config_load(&config, config_file, 1);
 
     int option;
@@ -624,6 +626,13 @@ main(int argc, char **argv)
                 break;
             case 'f':
                 config_file = optarg;
+
+#if defined(__OpenBSD__)
+                unveil(config_file, "r");
+                if (unveil(0, 0) == -1)
+                    die();
+#endif
+
                 config_load(&config, optarg, 1);
                 break;
             case 'h':
