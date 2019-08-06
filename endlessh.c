@@ -1,7 +1,7 @@
-#if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__))
-#define _BSD_SOURCE
+#if defined(__OpenBSD__)
+#  define _BSD_SOURCE  /* for pledge(2) */
 #else
-#define _XOPEN_SOURCE 600
+#  define _XOPEN_SOURCE 600
 #endif
 
 #include <time.h>
@@ -602,12 +602,9 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
 int
 main(int argc, char **argv)
 {
-
 #if (defined(__OpenBSD__))
-
-    if (pledge("inet stdio rpath",NULL) == -1)
-        err(EXIT_FAILURE,"pledge");
-
+    if (pledge("inet stdio rpath", NULL) == -1)
+        die();
 #endif
 
     struct config config = CONFIG_DEFAULT;
