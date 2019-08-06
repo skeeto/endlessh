@@ -631,7 +631,8 @@ main(int argc, char **argv)
 
 #if (defined(__OpenBSD__))
                 unveil(config_file,"r");
-                unveil(NULL,NULL);
+                if (unveil(NULL,NULL) == -1)
+                    die();
 #endif
 
                 config_load(&config, optarg, 1);
