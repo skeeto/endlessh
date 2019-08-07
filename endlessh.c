@@ -1,3 +1,7 @@
+/* Endlessh: an SSH tarpit
+ *
+ * This is free and unencumbered software released into the public domain.
+ */
 #if defined(__OpenBSD__)
 #  define _BSD_SOURCE  /* for pledge(2) and unveil(2) */
 #else
