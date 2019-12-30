@@ -790,11 +790,12 @@ main(int argc, char **argv)
                 if (!client) {
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
+                } else {
+                    fifo_append(fifo, client);
+                    logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
+                            client->ipaddr, client->port, client->fd,
+                            fifo->length, config.max_clients);
                 }
-                fifo_append(fifo, client);
-                logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
-                        client->ipaddr, client->port, client->fd,
-                        fifo->length, config.max_clients);
             }
         }
     }
