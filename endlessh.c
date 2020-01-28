@@ -653,7 +653,8 @@ main(int argc, char **argv)
                 config_set_port(&config, optarg, 1);
                 break;
             case 'v':
-                loglevel++;
+                if (loglevel < log_debug)
+                    loglevel++;
                 break;
             case 'V':
                 print_version();
