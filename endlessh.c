@@ -57,8 +57,10 @@ static enum loglevel {
     log_debug
 } loglevel = log_none;
 
+static void (*logmsg)(enum loglevel level, const char *, ...);
+
 static void
-logmsg(enum loglevel level, const char *format, ...)
+logstdio(enum loglevel level, const char *format, ...)
 {
     if (loglevel >= level) {
         int save = errno;
@@ -605,6 +607,7 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
 int
 main(int argc, char **argv)
 {
+    logmsg = logstdio;
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
 
