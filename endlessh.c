@@ -24,6 +24,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <syslog.h>
 
 #define ENDLESSH_VERSION           1.0
 
@@ -79,6 +80,26 @@ logstdio(enum loglevel level, const char *format, ...)
         vprintf(format, ap);
         va_end(ap);
         fputc('\n', stdout);
+
+        errno = save;
+    }
+}
+
+static void
+logsyslog(enum loglevel level, const char *format, ...)
+{
+    static const int prio_map[] = { LOG_NOTICE, LOG_INFO, LOG_DEBUG };
+
+    if (loglevel >= level) {
+        int save = errno;
+
+        /* Output the log message */
+        va_list ap;
+        va_start(ap, format);
+        char buf[256];
+        vsnprintf(buf, sizeof buf, format, ap);
+        va_end(ap);
+        syslog(prio_map[level], "%s", buf);
 
         errno = save;
     }
@@ -620,7 +641,7 @@ main(int argc, char **argv)
     config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "46d:f:hl:m:p:vV")) != -1) {
+    while ((option = getopt(argc, argv, "46d:f:hl:m:p:svV")) != -1) {
         switch (option) {
             case '4':
                 config_set_bind_family(&config, "4", 1);
@@ -655,6 +676,9 @@ main(int argc, char **argv)
             case 'p':
                 config_set_port(&config, optarg, 1);
                 break;
+            case 's':
+                logmsg = logsyslog;
+                break;
             case 'v':
                 if (loglevel < log_debug)
                     loglevel++;
@@ -674,8 +698,15 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Set output (log) to line buffered */
-    setvbuf(stdout, 0, _IOLBF, 0);
+    if (logmsg == logsyslog) {
+        /* Prepare the syslog */
+        const char *prog = strrchr(argv[0], '/');
+        prog = prog ? prog + 1 : argv[0];
+        openlog(prog, LOG_PID, LOG_DAEMON);
+    } else {
+        /* Set output (log) to line buffered */
+        setvbuf(stdout, 0, _IOLBF, 0);
+    }
 
     /* Log configuration */
     config_log(&config);
@@ -806,4 +837,7 @@ main(int argc, char **argv)
 
     fifo_destroy(fifo);
     statistics_log_totals(0);
+
+    if (logmsg == logsyslog)
+        closelog();
 }

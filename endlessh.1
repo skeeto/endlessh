@@ -1,4 +1,4 @@
-.Dd $Mdocdate: April 12 2019 $
+.Dd $Mdocdate: January 29 2020 $
 .Dt ENDLESSH 1
 .Os
 .Sh NAME
@@ -6,7 +6,7 @@
 .Nd An SSH tarpit
 .Sh SYNOPSIS
 .Nm endless
-.Op Fl 46chvV
+.Op Fl 46chsvV
 .Op Fl d Ar delay
 .Op Fl f Ar config
 .Op Fl l Ar max banner length
@@ -55,9 +55,12 @@ Maximum number of clients. Default: 4096
 Set the listening port. By default
 .Nm
 listens on port 2222.
+.It Fl s
+Print diagnostics to syslog. By default
+.Nm
+prints them to standard output.
 .It Fl v
-Print diagnostics to standard output. Can be specified
-numerous times to increase verbosity.
+Print diagnostics. Can be specified up to twice to increase verbosity.
 .It Fl V
 Causes
 .Nm

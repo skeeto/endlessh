@@ -11,14 +11,12 @@ occurs, this program doesn't depend on any cryptographic libraries. It's
 a simple, single-threaded, standalone C program. It uses `poll()` to
 trap multiple clients at a time.
 
-
-
 ## Usage
 
 Usage information is printed with `-h`.
 
 ```
-Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
+Usage: endlessh [-vhs] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -4        Bind to IPv4 only
   -6        Bind to IPv6 only
   -d INT    Message millisecond delay [10000]
@@ -27,7 +25,8 @@ Usage: endlessh [-vh] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -l INT    Maximum banner line length (3-255) [32]
   -m INT    Maximum number of clients [4096]
   -p INT    Listening port [2222]
-  -v        Print diagnostics to standard output (repeatable)
+  -s        Print diagnostics to syslog instead of standard output
+  -v        Print diagnostics (repeatable)
 ```
 
 Argument order matters. The configuration file is loaded when the `-f`
@@ -36,7 +35,8 @@ configuration file.
 
 By default no log messages are produced. The first `-v` enables basic
 logging and a second `-v` enables debugging logging (noisy). All log
-messages are sent to standard output.
+messages are sent to standard output by default. `-s` causes them to be
+sent to syslog.
 
     endlessh -v >endlessh.log 2>endlessh.err
 
