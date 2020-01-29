@@ -52,10 +52,10 @@ epochms(void)
 }
 
 static enum loglevel {
-    LOG_NONE,
-    LOG_INFO,
-    LOG_DEBUG
-} loglevel = LOG_NONE;
+    log_none,
+    log_info,
+    log_debug
+} loglevel = log_none;
 
 static void
 logmsg(enum loglevel level, const char *format, ...)
@@ -116,9 +116,9 @@ client_new(int fd, long long send_next)
          */
         int value = 1;
         int r = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value));
-        logmsg(LOG_DEBUG, "setsockopt(%d, SO_RCVBUF, %d) = %d", fd, value, r);
+        logmsg(log_debug, "setsockopt(%d, SO_RCVBUF, %d) = %d", fd, value, r);
         if (r == -1)
-            logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+            logmsg(log_debug, "errno = %d, %s", errno, strerror(errno));
 
         /* Get IP address */
         struct sockaddr_storage addr;
@@ -143,9 +143,9 @@ client_new(int fd, long long send_next)
 static void
 client_destroy(struct client *client)
 {
-    logmsg(LOG_DEBUG, "close(%d)", client->fd);
+    logmsg(log_debug, "close(%d)", client->fd);
     long long dt = epochms() - client->connect_time;
-    logmsg(LOG_INFO,
+    logmsg(log_info,
             "CLOSE host=%s port=%d fd=%d "
             "time=%lld.%03lld bytes=%lld",
             client->ipaddr, client->port, client->fd,
@@ -162,7 +162,7 @@ statistics_log_totals(struct client *clients)
     long long milliseconds = statistics.milliseconds;
     for (long long now = epochms(); clients; clients = clients->next)
         milliseconds += now - clients->connect_time;
-    logmsg(LOG_INFO, "TOTALS connects=%lld seconds=%lld.%03lld bytes=%lld",
+    logmsg(log_info, "TOTALS connects=%lld seconds=%lld.%03lld bytes=%lld",
            statistics.connects,
            milliseconds / 1000,
            milliseconds % 1000,
@@ -462,7 +462,7 @@ config_load(struct config *c, const char *file, int hardfail)
                     errno = 0;
                     char *end;
                     long v = strtol(tokens[1], &end, 10);
-                    if (errno || *end || v < LOG_NONE || v > LOG_DEBUG) {
+                    if (errno || *end || v < log_none || v > log_debug) {
                         fprintf(stderr, "%s:%ld: Invalid log level '%s'\n",
                                 file, lineno, tokens[1]);
                         if (hardfail) exit(EXIT_FAILURE);
@@ -480,11 +480,11 @@ config_load(struct config *c, const char *file, int hardfail)
 static void
 config_log(const struct config *c)
 {
-    logmsg(LOG_INFO, "Port %d", c->port);
-    logmsg(LOG_INFO, "Delay %ld", c->delay);
-    logmsg(LOG_INFO, "MaxLineLength %d", c->max_line_length);
-    logmsg(LOG_INFO, "MaxClients %d", c->max_clients);
-    logmsg(LOG_INFO, "BindFamily %s",
+    logmsg(log_info, "Port %d", c->port);
+    logmsg(log_info, "Delay %ld", c->delay);
+    logmsg(log_info, "MaxLineLength %d", c->max_line_length);
+    logmsg(log_info, "MaxClients %d", c->max_clients);
+    logmsg(log_info, "BindFamily %s",
         c->bind_family == AF_INET6 ? "IPv6 Only" :
         c->bind_family == AF_INET  ? "IPv4 Only" :
                                 "IPv4 Mapped IPv6");
@@ -524,15 +524,15 @@ server_create(int port, int family)
     int r, s, value;
 
     s = socket(family == AF_UNSPEC ? AF_INET6 : family, SOCK_STREAM, 0);
-    logmsg(LOG_DEBUG, "socket() = %d", s);
+    logmsg(log_debug, "socket() = %d", s);
     if (s == -1) die();
 
     /* Socket options are best effort, allowed to fail */
     value = 1;
     r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
-    logmsg(LOG_DEBUG, "setsockopt(%d, SO_REUSEADDR, true) = %d", s, r);
+    logmsg(log_debug, "setsockopt(%d, SO_REUSEADDR, true) = %d", s, r);
     if (r == -1)
-        logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+        logmsg(log_debug, "errno = %d, %s", errno, strerror(errno));
 
     /*
      * With OpenBSD IPv6 sockets are always IPv6-only, so the socket option
@@ -544,9 +544,9 @@ server_create(int port, int family)
         errno = 0;
         value = (family == AF_INET6);
         r = setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &value, sizeof(value));
-        logmsg(LOG_DEBUG, "setsockopt(%d, IPV6_V6ONLY, true) = %d", s, r);
+        logmsg(log_debug, "setsockopt(%d, IPV6_V6ONLY, true) = %d", s, r);
         if (r == -1)
-            logmsg(LOG_DEBUG, "errno = %d, %s", errno, strerror(errno));
+            logmsg(log_debug, "errno = %d, %s", errno, strerror(errno));
     }
 #endif
 
@@ -565,11 +565,11 @@ server_create(int port, int family)
         };
         r = bind(s, (void *)&addr6, sizeof(addr6));
     }
-    logmsg(LOG_DEBUG, "bind(%d, port=%d) = %d", s, port, r);
+    logmsg(log_debug, "bind(%d, port=%d) = %d", s, port, r);
     if (r == -1) die();
 
     r = listen(s, INT_MAX);
-    logmsg(LOG_DEBUG, "listen(%d) = %d", s, r);
+    logmsg(log_debug, "listen(%d) = %d", s, r);
     if (r == -1) die();
 
     return s;
@@ -583,7 +583,7 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
     int len = randline(line, max_line_length, rng);
     for (;;) {
         ssize_t out = write(client->fd, line, len);
-        logmsg(LOG_DEBUG, "write(%d) = %d", client->fd, (int)out);
+        logmsg(log_debug, "write(%d) = %d", client->fd, (int)out);
         if (out == -1) {
             if (errno == EINTR) {
                 continue;      /* try again */
@@ -742,13 +742,13 @@ main(int argc, char **argv)
         /* Wait for next event */
         struct pollfd fds = {server, POLLIN, 0};
         int nfds = fifo->length < config.max_clients;
-        logmsg(LOG_DEBUG, "poll(%d, %d)", nfds, timeout);
+        logmsg(log_debug, "poll(%d, %d)", nfds, timeout);
         int r = poll(&fds, nfds, timeout);
-        logmsg(LOG_DEBUG, "= %d", r);
+        logmsg(log_debug, "= %d", r);
         if (r == -1) {
             switch (errno) {
                 case EINTR:
-                    logmsg(LOG_DEBUG, "EINTR");
+                    logmsg(log_debug, "EINTR");
                     continue;
                 default:
                     fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
@@ -759,7 +759,7 @@ main(int argc, char **argv)
         /* Check for new incoming connections */
         if (fds.revents & POLLIN) {
             int fd = accept(server, 0, 0);
-            logmsg(LOG_DEBUG, "accept() = %d", fd);
+            logmsg(log_debug, "accept() = %d", fd);
             statistics.connects++;
             if (fd == -1) {
                 const char *msg = strerror(errno);
@@ -767,7 +767,7 @@ main(int argc, char **argv)
                     case EMFILE:
                     case ENFILE:
                         config.max_clients = fifo->length;
-                        logmsg(LOG_INFO,
+                        logmsg(log_info,
                                 "MaxClients %d",
                                 fifo->length);
                         break;
@@ -792,7 +792,7 @@ main(int argc, char **argv)
                     close(fd);
                 } else {
                     fifo_append(fifo, client);
-                    logmsg(LOG_INFO, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
+                    logmsg(log_info, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                             client->ipaddr, client->port, client->fd,
                             fifo->length, config.max_clients);
                 }
