@@ -312,6 +312,7 @@ struct config {
     .bind_family     = DEFAULT_BIND_FAMILY, \
 }
 
+static bool port_set = false;
 static void
 config_set_port(struct config *c, const char *s, int hardfail)
 {
@@ -325,6 +326,7 @@ config_set_port(struct config *c, const char *s, int hardfail)
     } else {
         c->port = tmp;
     }
+    port_set = true;
 }
 
 static void
@@ -702,6 +704,12 @@ main(int argc, char **argv)
     if (argv[optind]) {
         fprintf(stderr, "endlessh: too many arguments\n");
         exit(EXIT_FAILURE);
+    }
+
+    if (listen_on_stdin && port_set) {
+      fprintf(stderr, "endlessh: Cannot specify a port "
+              "when listening on stdin (-i)\n");
+      exit(EXIT_FAILURE);
     }
 
     if (logmsg == logsyslog) {
