@@ -26,7 +26,7 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
-#define ENDLESSH_VERSION           1.0
+#define ENDLESSH_VERSION           1.1
 
 #define DEFAULT_PORT              2222
 #define DEFAULT_DELAY            10000  /* milliseconds */
