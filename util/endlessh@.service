@@ -32,6 +32,10 @@ ProtectKernelLogs=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+
+LockPersonality=true
 MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
 SystemCallFilter=@basic-io @file-system @io-event @network-io @signal
