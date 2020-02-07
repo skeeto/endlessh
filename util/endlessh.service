@@ -40,6 +40,9 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6
 MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@basic-io @file-system @io-event @network-io @signal
+SystemCallFilter=arch_prctl brk mprotect
 
 [Install]
 WantedBy=multi-user.target
