@@ -9,6 +9,7 @@ Restart=always
 RestartSec=30sec
 ExecStart=/usr/local/bin/endlessh -i
 KillSignal=SIGTERM
+DynamicUser=true
 
 # Stop trying to restart the service if it restarts too many times in a row
 StartLimitInterval=5min
@@ -18,16 +19,15 @@ StandardOutput=journal
 StandardError=journal
 StandardInput=socket
 
-DynamicUser=true
-
+PrivateTmp=true
 PrivateDevices=true
 PrivateNetwork=true
 ProtectSystem=full
 ProtectHome=true
 InaccessiblePaths=/run /var
+PrivateUsers=true
 NoNewPrivileges=true
 ConfigurationDirectory=endlessh
-PrivateUsers=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
