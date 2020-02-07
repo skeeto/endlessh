@@ -28,6 +28,7 @@ InaccessiblePaths=/run /var
 PrivateUsers=true
 NoNewPrivileges=true
 ConfigurationDirectory=endlessh
+ProtectKernelLogs=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
