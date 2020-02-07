@@ -39,6 +39,10 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+
+LockPersonality=true
 MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
 SystemCallFilter=@basic-io @file-system @io-event @network-io @signal
