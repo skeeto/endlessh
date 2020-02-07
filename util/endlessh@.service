@@ -33,6 +33,9 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@basic-io @file-system @io-event @network-io @signal
+SystemCallFilter=arch_prctl brk mprotect ~socket
 
 [Install]
 WantedBy=multi-user.target
