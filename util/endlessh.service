@@ -38,6 +38,7 @@ ProtectKernelLogs=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
 MemoryDenyWriteExecute=true
 
 [Install]
