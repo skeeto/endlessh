@@ -7,9 +7,6 @@ PREFIX  = /usr/local
 
 all: endlessh
 
-endlessh: endlessh.c
-	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ endlessh.c $(LDLIBS)
-
 install: endlessh
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 endlessh $(DESTDIR)$(PREFIX)/bin/
