@@ -1,3 +1,5 @@
+[![Snap Status](https://build.snapcraft.io/badge/kz6fittycent/endlessh.svg)](https://build.snapcraft.io/user/kz6fittycent/endlessh)
+
 # Endlessh: an SSH tarpit
 
 Endlessh is an SSH tarpit [that *very* slowly sends an endless, random
