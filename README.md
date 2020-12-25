@@ -16,7 +16,7 @@ trap multiple clients at a time.
 Usage information is printed with `-h`.
 
 ```
-Usage: endlessh [-vhs] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
+Usage: endlessh [-vVhs] [-46] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -4        Bind to IPv4 only
   -6        Bind to IPv6 only
   -d INT    Message millisecond delay [10000]
@@ -27,6 +27,7 @@ Usage: endlessh [-vhs] [-d MS] [-f CONFIG] [-l LEN] [-m LIMIT] [-p PORT]
   -p INT    Listening port [2222]
   -s        Print diagnostics to syslog instead of standard output
   -v        Print diagnostics (repeatable)
+  -V        Print version information and exit
 ```
 
 Argument order matters. The configuration file is loaded when the `-f`
