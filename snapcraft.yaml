@@ -45,9 +45,7 @@ parts:
     plugin: make
     source: https://github.com/skeeto/endlessh
     source-type: git
-    build-packages:
-      - gcc
-      
+     
     override-pull: |
       snapcraftctl pull
       git checkout `git describe --tags --abbrev=0`      
