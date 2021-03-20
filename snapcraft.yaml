@@ -1,5 +1,5 @@
 name: endlessh
-version: 'git'
+adopt-info: endlessh
 summary: Endlessh is an SSH tarpit that very slowly sends an endless, random SSH banner
 descripton: |
   
@@ -27,6 +27,11 @@ descripton: |
 grade: stable
 confinement: strict
 
+base: core18
+grade: stable
+confinement: strict
+compression: lzo
+
 apps:
   endlessh:
   command: endlessh
@@ -42,3 +47,6 @@ parts:
     build-packages:
       - gcc
       
+    override-pull: |
+      snapcraftctl pull
+      git checkout `git describe --tags --abbrev=0`      
