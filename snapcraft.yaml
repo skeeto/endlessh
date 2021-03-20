@@ -42,9 +42,13 @@ apps:
 
 parts:
   endlessh:
-    plugin: make
+    plugin: nil
     source: https://github.com/skeeto/endlessh
     source-type: git
+    
+    override-build: |
+      make
+      ./endlessh &
      
     override-pull: |
       snapcraftctl pull
