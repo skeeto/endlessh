@@ -52,3 +52,4 @@ parts:
 
     build-packages:
       - build-essential
+      - libc6-dev
