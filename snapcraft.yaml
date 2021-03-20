@@ -48,7 +48,7 @@ parts:
      
     override-pull: |
       snapcraftctl pull
-      git checkout `git describe --tags --abbrev=0`      
+      snapcraftctl set-version "$(git describe --tags | sed 's/^v//' | cut -d "-" -f1)"     
 
     build-packages:
       - build-essential
