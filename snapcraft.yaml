@@ -49,3 +49,6 @@ parts:
     override-pull: |
       snapcraftctl pull
       git checkout `git describe --tags --abbrev=0`      
+
+    build-packages:
+      - build-essentials
