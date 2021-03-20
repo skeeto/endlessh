@@ -53,3 +53,4 @@ parts:
     build-packages:
       - build-essential
       - libc6-dev
+      - python3
