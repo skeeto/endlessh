@@ -51,4 +51,4 @@ parts:
       git checkout `git describe --tags --abbrev=0`      
 
     build-packages:
-      - build-essentials
+      - build-essential
