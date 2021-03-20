@@ -26,6 +26,7 @@ descripton: |
   
 grade: stable
 confinement: strict
+license: Unlicense
 
 base: core18
 grade: stable
@@ -41,7 +42,7 @@ apps:
 
 parts:
   endlessh:
-    plugin: autotools
+    plugin: make
     source: https://github.com/skeeto/endlessh
     source-type: git
     build-packages:
