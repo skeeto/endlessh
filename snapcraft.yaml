@@ -28,10 +28,9 @@ grade: stable
 confinement: strict
 license: Unlicense
 
-base: core18
+base: core20
 grade: stable
 confinement: strict
-compression: lzo
 
 apps:
   endlessh:
