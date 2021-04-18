@@ -58,9 +58,10 @@ static enum loglevel {
     log_debug
 } loglevel = log_none;
 
-static void (*logmsg)(enum loglevel level, const char *, ...);
+static void (*logmsg)(enum loglevel level, const char *, ...) __attribute__((format (printf, 2, 3)));
 
 static void
+__attribute__((format (printf, 2, 3)))
 logstdio(enum loglevel level, const char *format, ...)
 {
     if (loglevel >= level) {
@@ -86,6 +87,7 @@ logstdio(enum loglevel level, const char *format, ...)
 }
 
 static void
+__attribute__((format (printf, 2, 3)))
 logsyslog(enum loglevel level, const char *format, ...)
 {
     static const int prio_map[] = { LOG_NOTICE, LOG_INFO, LOG_DEBUG };
@@ -504,7 +506,7 @@ static void
 config_log(const struct config *c)
 {
     logmsg(log_info, "Port %d", c->port);
-    logmsg(log_info, "Delay %ld", c->delay);
+    logmsg(log_info, "Delay %d", c->delay);
     logmsg(log_info, "MaxLineLength %d", c->max_line_length);
     logmsg(log_info, "MaxClients %d", c->max_clients);
     logmsg(log_info, "BindFamily %s",
