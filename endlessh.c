@@ -244,6 +244,7 @@ fifo_destroy(struct fifo *q)
 }
 
 static void
+__attribute__((noreturn))
 die(void)
 {
     fprintf(stderr, "endlessh: fatal: %s\n", strerror(errno));
