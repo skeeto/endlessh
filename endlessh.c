@@ -105,7 +105,7 @@ logsyslog(enum loglevel level, const char *format, ...)
     }
 }
 
-struct {
+static struct {
     long long connects;
     long long milliseconds;
     long long bytes_sent;
