@@ -1,6 +1,7 @@
 .POSIX:
 CC       = cc
-CFLAGS   = -std=c99 -Wall -Wextra -Wno-missing-field-initializers -Os
+WARNINGS = -Wall -Wcast-align -Wcast-qual -Wextra -Wfloat-equal -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wmissing-prototypes -Wnull-dereference -Wpointer-arith -Wshadow -Wstrict-prototypes -Wundef -Wunused -Wwrite-strings
+CFLAGS   = -std=c99 $(WARNINGS) -Os
 CPPFLAGS =
 LDFLAGS  = -ggdb3
 LDLIBS   =
