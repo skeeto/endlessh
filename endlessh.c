@@ -117,6 +117,7 @@ struct client {
     long long connect_time;
     long long send_next;
     long long bytes_sent;
+    long send_iter;
     struct client *next;
     int port;
     int fd;
@@ -131,6 +132,7 @@ client_new(int fd, long long send_next)
         c->connect_time = epochms();
         c->send_next = send_next;
         c->bytes_sent = 0;
+        c->send_iter = 0;
         c->next = 0;
         c->fd = fd;
         c->port = 0;
@@ -171,10 +173,11 @@ client_destroy(struct client *client)
     long long dt = epochms() - client->connect_time;
     logmsg(log_info,
             "CLOSE host=%s port=%d fd=%d "
-            "time=%lld.%03lld bytes=%lld",
+            "time=%lld.%03lld bytes=%lld iter=%ld",
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
-            client->bytes_sent);
+            client->bytes_sent,
+            client->send_iter);
     statistics.milliseconds += dt;
     close(client->fd);
     free(client);
@@ -644,6 +647,7 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
             }
         } else {
             client->bytes_sent += out;
+            client->send_iter++;
             statistics.bytes_sent += out;
             return client;
         }
