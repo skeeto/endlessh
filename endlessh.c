@@ -44,7 +44,7 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-static long long
+static unsigned long long
 epochms(void)
 {
     struct timespec tv;
@@ -68,12 +68,12 @@ logstdio(enum loglevel level, const char *format, ...)
         int save = errno;
 
         /* Print a timestamp */
-        long long now = epochms();
+        unsigned long long now = epochms();
         time_t t = now / 1000;
         char date[64];
         struct tm tm[1];
         strftime(date, sizeof(date), "%Y-%m-%dT%H:%M:%S", gmtime_r(&t, tm));
-        printf("%s.%03lldZ ", date, now % 1000);
+        printf("%s.%03lluZ ", date, now % 1000);
 
         /* Print the rest of the log message */
         va_list ap;
@@ -108,23 +108,23 @@ logsyslog(enum loglevel level, const char *format, ...)
 }
 
 static struct {
-    long long connects;
-    long long milliseconds;
-    long long bytes_sent;
+    unsigned long long connects;
+    unsigned long long milliseconds;
+    unsigned long long bytes_sent;
 } statistics;
 
 struct client {
     char ipaddr[INET6_ADDRSTRLEN];
-    long long connect_time;
-    long long send_next;
-    long long bytes_sent;
+    unsigned long long connect_time;
+    unsigned long long send_next;
+    unsigned long long bytes_sent;
     struct client *next;
     int port;
     int fd;
 };
 
 static struct client *
-client_new(int fd, long long send_next)
+client_new(int fd, unsigned long long send_next)
 {
     struct client *c = malloc(sizeof(*c));
     if (c) {
@@ -169,10 +169,10 @@ static void
 client_destroy(struct client *client)
 {
     logmsg(log_debug, "close(%d)", client->fd);
-    long long dt = epochms() - client->connect_time;
+    unsigned long long dt = epochms() - client->connect_time;
     logmsg(log_info,
             "CLOSE host=%s port=%d fd=%d "
-            "time=%lld.%03lld bytes=%lld",
+            "time=%llu.%03llu bytes=%llu",
             client->ipaddr, client->port, client->fd,
             dt / 1000, dt % 1000,
             client->bytes_sent);
@@ -184,10 +184,10 @@ client_destroy(struct client *client)
 static void
 statistics_log_totals(const struct client *clients)
 {
-    long long milliseconds = statistics.milliseconds;
-    for (long long now = epochms(); clients; clients = clients->next)
+    unsigned long long milliseconds = statistics.milliseconds;
+    for (unsigned long long now = epochms(); clients; clients = clients->next)
         milliseconds += now - clients->connect_time;
-    logmsg(log_info, "TOTALS connects=%lld seconds=%lld.%03lld bytes=%lld",
+    logmsg(log_info, "TOTALS connects=%llu seconds=%llu.%03llu bytes=%llu",
            statistics.connects,
            milliseconds / 1000,
            milliseconds % 1000,
@@ -425,7 +425,7 @@ config_key_parse(const char *tok)
 static void
 config_load(struct config *c, const char *file, int hardfail)
 {
-    long lineno = 0;
+    unsigned long lineno = 0;
     FILE *f = fopen(file, "r");
     if (f) {
         char line[256];
@@ -452,13 +452,13 @@ config_load(struct config *c, const char *file, int hardfail)
                 case 0: /* Empty line */
                     continue;
                 case 1:
-                    fprintf(stderr, "%s:%ld: Missing value\n", file, lineno);
+                    fprintf(stderr, "%s:%lu: Missing value\n", file, lineno);
                     if (hardfail) exit(EXIT_FAILURE);
                     continue;
                 case 2: /* Expected */
                     break;
                 case 3:
-                    fprintf(stderr, "%s:%ld: Too many values\n", file, lineno);
+                    fprintf(stderr, "%s:%lu: Too many values\n", file, lineno);
                     if (hardfail) exit(EXIT_FAILURE);
                     continue;
             }
@@ -466,7 +466,7 @@ config_load(struct config *c, const char *file, int hardfail)
             enum config_key key = config_key_parse(tokens[0]);
             switch (key) {
                 case KEY_INVALID:
-                    fprintf(stderr, "%s:%ld: Unknown option '%s'\n",
+                    fprintf(stderr, "%s:%lu: Unknown option '%s'\n",
                             file, lineno, tokens[0]);
                     break;
                 case KEY_PORT:
@@ -489,7 +489,7 @@ config_load(struct config *c, const char *file, int hardfail)
                     char *end;
                     long v = strtol(tokens[1], &end, 10);
                     if (errno || *end || v < log_none || v > log_debug) {
-                        fprintf(stderr, "%s:%ld: Invalid log level '%s'\n",
+                        fprintf(stderr, "%s:%lu: Invalid log level '%s'\n",
                                 file, lineno, tokens[1]);
                         if (hardfail) exit(EXIT_FAILURE);
                     } else {
@@ -609,7 +609,7 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
     int len = randline(line, max_line_length, rng);
     for (;;) {
         ssize_t out = write(client->fd, line, len);
-        logmsg(log_debug, "write(%d) = %d", client->fd, (int)out);
+        logmsg(log_debug, "write(%d) = %zd", client->fd, out);
         if (out == -1) {
             if (errno == EINTR) {
                 continue;      /* try again */
@@ -763,7 +763,7 @@ main(int argc, char **argv)
 
         /* Enqueue clients that are due for another message */
         int timeout = -1;
-        long long now = epochms();
+        unsigned long long now = epochms();
         while (fifo->head) {
             if (fifo->head->send_next <= now) {
                 struct client *c = fifo_pop(fifo);
@@ -821,7 +821,7 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
             } else {
-                long long send_next = epochms() + config.delay;
+                unsigned long long send_next = epochms() + config.delay;
                 struct client *client = client_new(fd, send_next);
                 int flags = fcntl(fd, F_GETFL, 0);      /* cannot fail */
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK); /* cannot fail */
