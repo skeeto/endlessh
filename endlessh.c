@@ -182,7 +182,7 @@ client_destroy(struct client *client)
 }
 
 static void
-statistics_log_totals(struct client *clients)
+statistics_log_totals(const struct client *clients)
 {
     long long milliseconds = statistics.milliseconds;
     for (long long now = epochms(); clients; clients = clients->next)
