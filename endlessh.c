@@ -58,7 +58,7 @@ static enum loglevel {
     log_debug
 } loglevel = log_none;
 
-static void (*logmsg)(enum loglevel level, const char *, ...) __attribute__((format (printf, 2, 3)));
+static void (*logmsg)(enum loglevel, const char *, ...) __attribute__((format (printf, 2, 3)));
 
 static void
 __attribute__((format (printf, 2, 3)))
