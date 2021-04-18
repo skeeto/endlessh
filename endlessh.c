@@ -32,6 +32,7 @@
 #define DEFAULT_DELAY            10000  /* milliseconds */
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
+#define DEFAULT_STATS_INTERVAL      60  /* minutes */
 
 #if defined(__FreeBSD__)
 #  define DEFAULT_CONFIG_FILE "/usr/local/etc/endlessh.config"
@@ -301,6 +302,7 @@ struct config {
     int max_line_length;
     int max_clients;
     int bind_family;
+    int stats_interval;
 };
 
 #define CONFIG_DEFAULT { \
@@ -309,6 +311,7 @@ struct config {
     .max_line_length = DEFAULT_MAX_LINE_LENGTH, \
     .max_clients     = DEFAULT_MAX_CLIENTS, \
     .bind_family     = DEFAULT_BIND_FAMILY, \
+    .stats_interval  = DEFAULT_STATS_INTERVAL, \
 }
 
 static void
@@ -392,6 +395,21 @@ config_set_bind_family(struct config *c, const char *s, int hardfail)
   }
 }
 
+static void
+config_set_stats_interval(struct config *c, const char *s, int hardfail)
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 0 || tmp > 24 * 60) {
+        fprintf(stderr, "endlessh: Invalid statistics interval: %s\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->stats_interval = tmp;
+    }
+}
+
 enum config_key {
     KEY_INVALID,
     KEY_PORT,
@@ -400,6 +418,7 @@ enum config_key {
     KEY_MAX_CLIENTS,
     KEY_LOG_LEVEL,
     KEY_BIND_FAMILY,
+    KEY_STATS_INTERVAL,
 };
 
 static enum config_key
@@ -411,7 +430,8 @@ config_key_parse(const char *tok)
         [KEY_MAX_LINE_LENGTH] = "MaxLineLength",
         [KEY_MAX_CLIENTS]     = "MaxClients",
         [KEY_LOG_LEVEL]       = "LogLevel",
-        [KEY_BIND_FAMILY]     = "BindFamily"
+        [KEY_BIND_FAMILY]     = "BindFamily",
+        [KEY_STATS_INTERVAL]  = "StatsInterval"
     };
     for (size_t i = 1; i < sizeof(table) / sizeof(*table); i++)
         if (!strcmp(tok, table[i]))
@@ -493,6 +513,9 @@ config_load(struct config *c, const char *file, int hardfail)
                         loglevel = v;
                     }
                 } break;
+                case KEY_STATS_INTERVAL:
+                    config_set_stats_interval(c, tokens[1], hardfail);
+                    break;
             }
         }
 
@@ -511,13 +534,14 @@ config_log(const struct config *c)
         c->bind_family == AF_INET6 ? "IPv6 Only" :
         c->bind_family == AF_INET  ? "IPv4 Only" :
                                 "IPv4 Mapped IPv6");
+    logmsg(log_info, "StatsInterval %d", c->stats_interval);
 }
 
 static void
 usage(FILE *f)
 {
     fprintf(f, "Usage: endlessh [-vh] [-46] [-d MS] [-f CONFIG] [-l LEN] "
-                               "[-m LIMIT] [-p PORT]\n");
+                               "[-m LIMIT] [-p PORT] [-S MIN]\n");
     fprintf(f, "  -4        Bind to IPv4 only\n");
     fprintf(f, "  -6        Bind to IPv6 only\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
@@ -530,6 +554,8 @@ usage(FILE *f)
     fprintf(f, "  -m INT    Maximum number of clients ["
             XSTR(DEFAULT_MAX_CLIENTS) "]\n");
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
+    fprintf(f, "  -S INT    Statistics minute interval ["
+            XSTR(DEFAULT_STATS_INTERVAL) "]\n");
     fprintf(f, "  -v        Print diagnostics to standard output "
             "(repeatable)\n");
     fprintf(f, "  -V        Print version information and exit\n");
@@ -641,7 +667,7 @@ main(int argc, char **argv)
     config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "46d:f:hl:m:p:svV")) != -1) {
+    while ((option = getopt(argc, argv, "46d:f:hl:m:p:sSvV")) != -1) {
         switch (option) {
             case '4':
                 config_set_bind_family(&config, "4", 1);
@@ -678,6 +704,9 @@ main(int argc, char **argv)
                 break;
             case 's':
                 logmsg = logsyslog;
+                break;
+            case 'S':
+                config_set_stats_interval(&config, optarg, 1);
                 break;
             case 'v':
                 if (loglevel < log_debug)
@@ -735,7 +764,8 @@ main(int argc, char **argv)
     struct fifo fifo[1];
     fifo_init(fifo);
 
-    unsigned long rng = epochms();
+    long long last_stats_dump = epochms();
+    unsigned long rng = last_stats_dump;
 
     int server = server_create(config.port, config.bind_family);
 
@@ -758,9 +788,16 @@ main(int argc, char **argv)
             dumpstats = 0;
         }
 
+        long long now = epochms();
+
+        if (config.stats_interval != 0 && now - last_stats_dump > config.stats_interval * 60 * 1000) {
+            /* print stats every StatsInterval minutes */
+            statistics_log_totals(fifo->head);
+            last_stats_dump = now;
+        }
+
         /* Enqueue clients that are due for another message */
         int timeout = -1;
-        long long now = epochms();
         while (fifo->head) {
             if (fifo->head->send_next <= now) {
                 struct client *c = fifo_pop(fifo);
