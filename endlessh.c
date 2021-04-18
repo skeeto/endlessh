@@ -642,6 +642,8 @@ sendline(struct client *client, int max_line_length, unsigned long *rng)
             } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return client; /* don't care */
             } else {
+                if (errno != EPIPE)
+                    logmsg(log_debug, "errno = %d, %s", errno, strerror(errno));
                 client_destroy(client);
                 return 0;
             }
