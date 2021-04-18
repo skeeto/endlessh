@@ -504,7 +504,7 @@ static void
 config_log(const struct config *c)
 {
     logmsg(log_info, "Port %d", c->port);
-    logmsg(log_info, "Delay %ld", c->delay);
+    logmsg(log_info, "Delay %d", c->delay);
     logmsg(log_info, "MaxLineLength %d", c->max_line_length);
     logmsg(log_info, "MaxClients %d", c->max_clients);
     logmsg(log_info, "BindFamily %s",
