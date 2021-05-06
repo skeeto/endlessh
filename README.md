@@ -19,11 +19,19 @@ Change the default ssh port before doing this and restart the real ssh service t
 sudo nano /etc/ssh/sshd_config
 # Change Port 22 to something else within valid range
 sudo systemctl restart sshd.service
+
+# for debian / ubuntu distros
+sudo apt install git -y 
+
+# for arch distros
+sudo pacman -S git
+
+git clone https://github.com/skeeto/endlessh.git
+cd endlessh
 ```
 ### Docker
 
 ```
-# cd into src dir
 sudo docker build .
 sudo docker run -d --restart=always -p 22:2222 endlessh
 ```
