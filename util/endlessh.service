@@ -34,10 +34,19 @@ PrivateUsers=true
 
 NoNewPrivileges=true
 ConfigurationDirectory=endlessh
+ProtectKernelLogs=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+
+LockPersonality=true
 MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@basic-io @file-system @io-event @network-io @signal
+SystemCallFilter=arch_prctl brk mprotect
 
 [Install]
 WantedBy=multi-user.target
