@@ -11,6 +11,33 @@ occurs, this program doesn't depend on any cryptographic libraries. It's
 a simple, single-threaded, standalone C program. It uses `poll()` to
 trap multiple clients at a time.
 
+## Quick Usage 
+
+Change the default ssh port before doing this and restart the real ssh service to run on another port!
+
+```
+sudo nano /etc/ssh/sshd_config
+# Change Port 22 to something else within valid range
+sudo systemctl restart sshd.service
+```
+### Docker
+
+```
+# cd into src dir
+sudo docker build .
+sudo docker run -d --restart=always -p 22:2222 endlessh
+```
+
+### without Docker
+
+```
+sudo make install
+sudo crontab -e
+# insert:
+@reboot sudo sudolessendlessh
+# safe the file 
+```
+
 ## Usage
 
 Usage information is printed with `-h`.
