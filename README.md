@@ -34,8 +34,8 @@ sudo docker run -d --restart=always -p 22:2222 endlessh
 sudo make install
 sudo crontab -e
 # insert:
-@reboot sudo sudolessendlessh
-# safe the file 
+@reboot sudo endlessh
+# safe the file && sudo reboot
 ```
 
 ## Usage
