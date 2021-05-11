@@ -10,6 +10,7 @@
 
 #include <time.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <limits.h>
 #include <signal.h>
@@ -311,6 +312,7 @@ struct config {
     .bind_family     = DEFAULT_BIND_FAMILY, \
 }
 
+static bool port_set = false;
 static void
 config_set_port(struct config *c, const char *s, int hardfail)
 {
@@ -324,6 +326,7 @@ config_set_port(struct config *c, const char *s, int hardfail)
     } else {
         c->port = tmp;
     }
+    port_set = true;
 }
 
 static void
@@ -525,6 +528,7 @@ usage(FILE *f)
     fprintf(f, "  -f        Set and load config file ["
             DEFAULT_CONFIG_FILE "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
+    fprintf(f, "  -i        Expect an existing socket on stdin.\n");
     fprintf(f, "  -l INT    Maximum banner line length (3-255) ["
             XSTR(DEFAULT_MAX_LINE_LENGTH) "]\n");
     fprintf(f, "  -m INT    Maximum number of clients ["
@@ -640,8 +644,9 @@ main(int argc, char **argv)
 
     config_load(&config, config_file, 1);
 
+    bool listen_on_stdin = false;
     int option;
-    while ((option = getopt(argc, argv, "46d:f:hl:m:p:svV")) != -1) {
+    while ((option = getopt(argc, argv, "46d:f:hil:m:p:svV")) != -1) {
         switch (option) {
             case '4':
                 config_set_bind_family(&config, "4", 1);
@@ -666,6 +671,9 @@ main(int argc, char **argv)
             case 'h':
                 usage(stdout);
                 exit(EXIT_SUCCESS);
+                break;
+            case 'i':
+                listen_on_stdin = true;
                 break;
             case 'l':
                 config_set_max_line_length(&config, optarg, 1);
@@ -696,6 +704,12 @@ main(int argc, char **argv)
     if (argv[optind]) {
         fprintf(stderr, "endlessh: too many arguments\n");
         exit(EXIT_FAILURE);
+    }
+
+    if (listen_on_stdin && port_set) {
+      fprintf(stderr, "endlessh: Cannot specify a port "
+              "when listening on stdin (-i)\n");
+      exit(EXIT_FAILURE);
     }
 
     if (logmsg == logsyslog) {
@@ -737,7 +751,12 @@ main(int argc, char **argv)
 
     unsigned long rng = epochms();
 
-    int server = server_create(config.port, config.bind_family);
+    int server;
+    if(listen_on_stdin) {
+        server = STDIN_FILENO;
+    } else {
+        server = server_create(config.port, config.bind_family);
+    }
 
     while (running) {
         if (reload) {
@@ -746,9 +765,11 @@ main(int argc, char **argv)
             int oldfamily = config.bind_family;
             config_load(&config, config_file, 0);
             config_log(&config);
-            if (oldport != config.port || oldfamily != config.bind_family) {
-                close(server);
-                server = server_create(config.port, config.bind_family);
+            if(!listen_on_stdin) {
+                if (oldport != config.port || oldfamily != config.bind_family) {
+                    close(server);
+                    server = server_create(config.port, config.bind_family);
+                }
             }
             reload = 0;
         }

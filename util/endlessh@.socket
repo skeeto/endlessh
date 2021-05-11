@@ -1,0 +1,9 @@
+[Unit]
+Description=Endlessh SSH Tarpit socket
+Documentation=man:endlessh(1)
+
+[Socket]
+ListenStream=%i
+
+[Install]
+WantedBy=sockets.target
