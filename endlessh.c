@@ -516,8 +516,8 @@ config_log(const struct config *c)
 static void
 usage(FILE *f)
 {
-    fprintf(f, "Usage: endlessh [-vh] [-46] [-d MS] [-f CONFIG] [-l LEN] "
-                               "[-m LIMIT] [-p PORT]\n");
+    fprintf(f, "Usage: endlessh [-vVhs] [-46] [-d MS] [-f CONFIG] [-l LEN] "
+            "[-m LIMIT] [-p PORT]\n");
     fprintf(f, "  -4        Bind to IPv4 only\n");
     fprintf(f, "  -6        Bind to IPv6 only\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
@@ -530,6 +530,8 @@ usage(FILE *f)
     fprintf(f, "  -m INT    Maximum number of clients ["
             XSTR(DEFAULT_MAX_CLIENTS) "]\n");
     fprintf(f, "  -p INT    Listening port [" XSTR(DEFAULT_PORT) "]\n");
+    fprintf(f, "  -s        Print diagnostics to syslog instead of "
+            "standard output\n");
     fprintf(f, "  -v        Print diagnostics to standard output "
             "(repeatable)\n");
     fprintf(f, "  -V        Print version information and exit\n");
