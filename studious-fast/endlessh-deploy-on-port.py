@@ -12,17 +12,17 @@ args = parser.parse_args()
 #
 # READ PRESETS DATA
 script_endlessh_preset1, service_endlessh_preset1 = "", ""
-with open("endlessh-call-port_N.service$",'rb') as FileRead_in1_KC:
+with open("presets/endlessh-call-port_N.service$",'rb') as FileRead_in1_KC:
     service_endlessh_preset1 = FileRead_in1_KC.read().decode()
     FileRead_in1_KC.close()
 # 
-with open("endlessh-script-port_N.sh$",'rb') as FileRead_in1_KC:
+with open("presets/endlessh-script-port_N.sh$",'rb') as FileRead_in1_KC:
     script_endlessh_preset1 = FileRead_in1_KC.read().decode()
     FileRead_in1_KC.close()
 # ~~~
 # Get Endlessh port from argparsing
-if args.endlessh_port: # args setted fine.
-    endlessh_port = args.endlessh_port
+if args.port: # args setted fine.
+    endlessh_port = args.port
 else: # no args setted... so default set to (port: 22)...
     endlessh_port = 22
 #
@@ -48,18 +48,18 @@ script_endlessh_preset1 = script_endlessh_preset1.format(
 with open("{service_endlessh_path}/{service_endlessh_filename}".format(
         service_endlessh_path = service_endlessh_path,
         service_endlessh_filename = service_endlessh_filename
-    ), 'rb') as f_out_re:
-    f_out_re.write(service_endlessh_preset1)
+    ), 'wb') as f_out_re:
+    f_out_re.write(service_endlessh_preset1.encode())
     f_out_re.close()
 #
 with open("{script_endlessh_path}/{script_endlessh_filename}".format(
         script_endlessh_path = script_endlessh_path,
         script_endlessh_filename = script_endlessh_filename
-    ), 'rb') as f_out_re:
-    f_out_re.write(script_endlessh_preset1)
+    ), 'wb') as f_out_re:
+    f_out_re.write(script_endlessh_preset1.encode())
     f_out_re.close()
 # change execution right to use the launch script
 system("sudo chmod +x {}".format(script_endlessh_path+"/"+script_endlessh_filename))
 # enable & start the service of the endlessh deploy 
-system("sudo systemctl enable --now {service}".format(service = service_endlessh_filename))
+system("sudo systemctl enable --now {service} && sudo systemctl status {service}".format(service = service_endlessh_filename))
 exit(0)
