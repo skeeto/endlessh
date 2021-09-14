@@ -8,6 +8,6 @@ Type=simple
 Restart=always
 RestartSec=15
 User=root
-ExecStart=/bin/bash /opt/endless-script-p{port_number}.sh
+ExecStart=/bin/bash /opt/endlessh-script-p{port_number}.sh
 [Install]
 WantedBy=multi-user.target
