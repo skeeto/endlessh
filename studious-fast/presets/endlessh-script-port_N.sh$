@@ -1,0 +1,6 @@
+#!/bin/bash
+while :
+do
+    /usr/bin/endlessh -4 -d 5000 -l 128 -m 4096 -p {port_number} -s -v
+    sleep 60
+done
