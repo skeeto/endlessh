@@ -29,7 +29,7 @@ else: # no args setted... so default set to (port: 22)...
 # ~~~
 # Destination path definition
 service_endlessh_path = "/etc/systemd/system"
-script_endlessh_path = "/opt"
+script_endlessh_path = "/opt/ssh/endlessh"
 # Destination filename definition with using the port number inside the names
 service_endlessh_filename = "endlessh-call-p{port}.service".format(
     port = endlessh_port
