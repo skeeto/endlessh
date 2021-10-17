@@ -19,3 +19,8 @@ install: endlessh
 
 clean:
 	rm -rf endlessh
+
+docker:
+	docker build . -t endlessh
+run:
+	docker run --rm -it --init endlessh

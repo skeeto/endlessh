@@ -1,15 +1,12 @@
 FROM alpine:3.9 as builder
-RUN apk add --no-cache build-base
+
+RUN apk add --no-cache make gcc libc-dev
 ADD endlessh.c Makefile /
-RUN make
+RUN make LDFLAGS="-static -s"
 
-
-FROM alpine:3.9
+FROM scratch
 
 COPY --from=builder /endlessh /
-
 EXPOSE 2222/tcp
-
 ENTRYPOINT ["/endlessh"]
-
 CMD ["-v"]
