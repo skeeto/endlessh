@@ -112,7 +112,7 @@ need to use `-D__EXTENSIONS__` in `CFLAGS`.
 
 The man page needs to go into a different path for OpenBSD's `man` command:
 
-```
+```diff
 diff --git a/Makefile b/Makefile
 index 119347a..dedf69d 100644
 --- a/Makefile
