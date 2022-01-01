@@ -112,22 +112,6 @@ need to use `-D__EXTENSIONS__` in `CFLAGS`.
 
 The man page needs to go into a different path for OpenBSD's `man` command:
 
-```
-diff --git a/Makefile b/Makefile
-index 119347a..dedf69d 100644
---- a/Makefile
-+++ b/Makefile
-@@ -14,8 +14,8 @@ endlessh: endlessh.c
- install: endlessh
-        install -d $(DESTDIR)$(PREFIX)/bin
-        install -m 755 endlessh $(DESTDIR)$(PREFIX)/bin/
--       install -d $(DESTDIR)$(PREFIX)/share/man/man1
--       install -m 644 endlessh.1 $(DESTDIR)$(PREFIX)/share/man/man1/
-+       install -d $(DESTDIR)$(PREFIX)/man/man1
-+       install -m 644 endlessh.1 $(DESTDIR)$(PREFIX)/man/man1/
-
- clean:
-        rm -rf endlessh
-```
+    make MANDIR=/usr/local/man install
 
 [np]: https://nullprogram.com/blog/2019/03/22/
