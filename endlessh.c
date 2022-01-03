@@ -362,7 +362,7 @@ config_set_max_line_length(struct config *c, const char *s, int hardfail)
     errno = 0;
     char *end;
     long tmp = strtol(s, &end, 10);
-    if (errno || *end || tmp < 3 || tmp > 255) {
+    if (errno || *end || tmp < 3 || tmp > 4096) {
         fprintf(stderr, "endlessh: Invalid line length: %s\n", s);
         if (hardfail)
             exit(EXIT_FAILURE);
