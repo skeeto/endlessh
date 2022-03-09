@@ -34,9 +34,14 @@ PrivateUsers=true
 
 NoNewPrivileges=true
 ConfigurationDirectory=endlessh
-ProtectKernelTunables=true
 ProtectKernelModules=true
+
+# If you are running Endlessh in a LXC container
+# And recieve a "Failed to set up mount namespacing" error
+# Comment these two lines
+ProtectKernelTunables=true
 ProtectControlGroups=true
+
 MemoryDenyWriteExecute=true
 
 [Install]
