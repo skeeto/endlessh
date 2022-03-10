@@ -30,6 +30,7 @@
 
 #define DEFAULT_PORT              2222
 #define DEFAULT_DELAY            10000  /* milliseconds */
+#define DEFAULT_DELAY_JITTER         0  /* Percent; for backward compatibility */
 #define DEFAULT_MAX_LINE_LENGTH     32
 #define DEFAULT_MAX_CLIENTS       4096
 
@@ -103,6 +104,14 @@ logsyslog(enum loglevel level, const char *format, ...)
 
         errno = save;
     }
+}
+
+static long long random_delay(int delay, uint16_t jitter) {
+    if(!jitter)
+        return delay;
+
+    long long max_difference = delay*jitter/100;
+    return delay+(rand()%(2*max_difference))-max_difference; //insecure rand() was used on purpose to avoid potential performance bottleneck
 }
 
 static struct {
@@ -298,6 +307,7 @@ sigusr1_handler(int signal)
 struct config {
     int port;
     int delay;
+    uint16_t jitter;
     int max_line_length;
     int max_clients;
     int bind_family;
@@ -306,6 +316,7 @@ struct config {
 #define CONFIG_DEFAULT { \
     .port            = DEFAULT_PORT, \
     .delay           = DEFAULT_DELAY, \
+    .jitter          = DEFAULT_DELAY_JITTER, \
     .max_line_length = DEFAULT_MAX_LINE_LENGTH, \
     .max_clients     = DEFAULT_MAX_CLIENTS, \
     .bind_family     = DEFAULT_BIND_FAMILY, \
@@ -338,6 +349,21 @@ config_set_delay(struct config *c, const char *s, int hardfail)
             exit(EXIT_FAILURE);
     } else {
         c->delay = tmp;
+    }
+}
+
+static void
+config_set_jitter(struct config *c, const char *s, int hardfail) //TODO
+{
+    errno = 0;
+    char *end;
+    long tmp = strtol(s, &end, 10);
+    if (errno || *end || tmp < 0 || tmp > 100) {
+        fprintf(stderr, "endlessh: Invalid jitter: %s (0 <= jitter <= 100)\n", s);
+        if (hardfail)
+            exit(EXIT_FAILURE);
+    } else {
+        c->jitter = (uint16_t)tmp;
     }
 }
 
@@ -396,6 +422,7 @@ enum config_key {
     KEY_INVALID,
     KEY_PORT,
     KEY_DELAY,
+    KEY_JITTER,
     KEY_MAX_LINE_LENGTH,
     KEY_MAX_CLIENTS,
     KEY_LOG_LEVEL,
@@ -408,6 +435,7 @@ config_key_parse(const char *tok)
     static const char *const table[] = {
         [KEY_PORT]            = "Port",
         [KEY_DELAY]           = "Delay",
+        [KEY_JITTER]          = "Jitter",
         [KEY_MAX_LINE_LENGTH] = "MaxLineLength",
         [KEY_MAX_CLIENTS]     = "MaxClients",
         [KEY_LOG_LEVEL]       = "LogLevel",
@@ -472,6 +500,9 @@ config_load(struct config *c, const char *file, int hardfail)
                 case KEY_DELAY:
                     config_set_delay(c, tokens[1], hardfail);
                     break;
+                case KEY_JITTER:
+                    config_set_jitter(c, tokens[1], hardfail);
+                    break;
                 case KEY_MAX_LINE_LENGTH:
                     config_set_max_line_length(c, tokens[1], hardfail);
                     break;
@@ -505,6 +536,7 @@ config_log(const struct config *c)
 {
     logmsg(log_info, "Port %d", c->port);
     logmsg(log_info, "Delay %d", c->delay);
+    logmsg(log_info, "Jitter %d", c->jitter);
     logmsg(log_info, "MaxLineLength %d", c->max_line_length);
     logmsg(log_info, "MaxClients %d", c->max_clients);
     logmsg(log_info, "BindFamily %s",
@@ -522,6 +554,8 @@ usage(FILE *f)
     fprintf(f, "  -6        Bind to IPv6 only\n");
     fprintf(f, "  -d INT    Message millisecond delay ["
             XSTR(DEFAULT_DELAY) "]\n");
+    fprintf(f, "  -j FLOAT    Delay Jitter in Percent ["
+            XSTR(DEFAULT_DELAY_JITTER) "]\n");
     fprintf(f, "  -f        Set and load config file ["
             DEFAULT_CONFIG_FILE "]\n");
     fprintf(f, "  -h        Print this help message and exit\n");
@@ -632,6 +666,8 @@ main(int argc, char **argv)
     struct config config = CONFIG_DEFAULT;
     const char *config_file = DEFAULT_CONFIG_FILE;
 
+    srand((unsigned int)time(NULL));  //insecure rand() was used on purpose to avoid potential performance bottleneck
+
 #if defined(__OpenBSD__)
     unveil(config_file, "r"); /* return ignored as the file may not exist */
     if (pledge("inet stdio rpath unveil", 0) == -1)
@@ -641,7 +677,7 @@ main(int argc, char **argv)
     config_load(&config, config_file, 1);
 
     int option;
-    while ((option = getopt(argc, argv, "46d:f:hl:m:p:svV")) != -1) {
+    while ((option = getopt(argc, argv, "46d:j:f:hl:m:p:svV")) != -1) {
         switch (option) {
             case '4':
                 config_set_bind_family(&config, "4", 1);
@@ -651,6 +687,9 @@ main(int argc, char **argv)
                 break;
             case 'd':
                 config_set_delay(&config, optarg, 1);
+                break;
+            case 'j':
+                config_set_jitter(&config, optarg, 1);
                 break;
             case 'f':
                 config_file = optarg;
@@ -765,7 +804,7 @@ main(int argc, char **argv)
             if (fifo->head->send_next <= now) {
                 struct client *c = fifo_pop(fifo);
                 if (sendline(c, config.max_line_length, &rng)) {
-                    c->send_next = now + config.delay;
+                    c->send_next = now + random_delay(config.delay, config.jitter);
                     fifo_append(fifo, c);
                 }
             } else {
@@ -818,7 +857,7 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
             } else {
-                long long send_next = epochms() + config.delay;
+                long long send_next = epochms() + random_delay(config.delay, config.jitter);
                 struct client *client = client_new(fd, send_next);
                 int flags = fcntl(fd, F_GETFL, 0);      /* cannot fail */
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK); /* cannot fail */
