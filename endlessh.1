@@ -8,6 +8,7 @@
 .Nm endless
 .Op Fl 46chsvV
 .Op Fl d Ar delay
+.Op Fl j Ar jitter
 .Op Fl f Ar config
 .Op Fl l Ar max banner length
 .Op Fl m Ar max clients
@@ -40,6 +41,8 @@ Forces
 to use IPv6 addresses only.
 .It Fl d Ar delay
 Message milliseconds delay. Default: 10000
+.It Fl j Ar jitter
+Randomizes the delay by j% (0-100). Default: 0 (no jitter)
 .It Fl f Ar config
 Set and load config file.
 By default
