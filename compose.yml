@@ -1,0 +1,25 @@
+name: endlessh
+services:
+  endlessh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: endlessh
+    image: endlessh
+    networks:
+      default: null
+    ports:
+    - mode: ingress
+      target: 2222
+      published: "2222"
+      protocol: tcp
+    restart: unless-stopped
+    volumes:
+    - type: bind
+      source: ./etc-endlessh
+      target: /etc/endlessh
+      bind:
+        create_host_path: true
+networks:
+  default:
+    name: endlessh_default
