@@ -1,4 +1,5 @@
 # Endlessh: an SSH tarpit
+[![Codacy Security Scan](https://github.com/Sanchez-Industries/endlessh/actions/workflows/codacy.yml/badge.svg)](https://github.com/Sanchez-Industries/endlessh/actions/workflows/codacy.yml)
 
 Endlessh is an SSH tarpit [that *very* slowly sends an endless, random
 SSH banner][np]. It keeps SSH clients locked up for hours or even days
