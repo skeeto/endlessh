@@ -107,6 +107,7 @@ logsyslog(enum loglevel level, const char *format, ...)
 
 static struct {
     long long connects;
+    long long active;
     long long milliseconds;
     long long bytes_sent;
 } statistics;
@@ -175,6 +176,7 @@ client_destroy(struct client *client)
             dt / 1000, dt % 1000,
             client->bytes_sent);
     statistics.milliseconds += dt;
+    statistics.active-=1;
     close(client->fd);
     free(client);
 }
@@ -185,8 +187,9 @@ statistics_log_totals(struct client *clients)
     long long milliseconds = statistics.milliseconds;
     for (long long now = epochms(); clients; clients = clients->next)
         milliseconds += now - clients->connect_time;
-    logmsg(log_info, "TOTALS connects=%lld seconds=%lld.%03lld bytes=%lld",
+    logmsg(log_info, "TOTALS connects=%lld active=%lld seconds=%lld.%03lld bytes=%lld",
            statistics.connects,
+           statistics.active,
            milliseconds / 1000,
            milliseconds % 1000,
            statistics.bytes_sent);
@@ -826,6 +829,7 @@ main(int argc, char **argv)
                     fprintf(stderr, "endlessh: warning: out of memory\n");
                     close(fd);
                 } else {
+                    statistics.active+=1;
                     fifo_append(fifo, client);
                     logmsg(log_info, "ACCEPT host=%s port=%d fd=%d n=%d/%d",
                             client->ipaddr, client->port, client->fd,
