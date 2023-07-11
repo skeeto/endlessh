@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+command=/usr/bin/endlessh
+supervisor="supervise-daemon"
+pidfile=/run/endlessh.pid
+
+depend() {
+        need net
+}
+
+reload() {
+        ebegin "Reloading endlessh"
+        ${supervisor} ${RC_SVCNAME} --signal HUP --pidfile "${pidfile}"
+        eend $?
+}
